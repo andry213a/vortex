@@ -1,0 +1,45 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "vortex-nas"
+version = "1.0.0"
+description = "Vortex: servidor local de archivos NAS ligero con interfaz HizSearch"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Vortex" }]
+dependencies = [
+    "fastapi>=0.115,<1.0",
+    "uvicorn[standard]>=0.30,<1.0",
+    "pydantic>=2.8,<3.0",
+    "python-jose[cryptography]>=3.3,<4.0",
+    "passlib>=1.7.4,<2.0",
+    "python-multipart>=0.0.9",
+    "zipstream-ng>=1.7,<2.0",
+    "zeroconf>=0.132,<1.0",
+    "psutil>=6.0,<7.0",
+    "flet==0.24.1",
+    "httpx>=0.27,<1.0",
+    "platformdirs>=4.2,<5.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0,<9.0", "pytest-asyncio>=0.23,<1.0", "pyinstaller>=6.6,<7.0", "ruff>=0.5,<1.0"]
+
+[project.scripts]
+vortex = "vortex.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["vortex*"]
+
+[tool.setuptools.package-data]
+vortex = ["static/**/*"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

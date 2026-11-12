@@ -1,0 +1,12 @@
+fastapi>=0.115,<1.0
+uvicorn[standard]>=0.30,<1.0
+pydantic>=2.8,<3.0
+python-jose[cryptography]>=3.3,<4.0
+passlib>=1.7.4,<2.0
+python-multipart>=0.0.9
+zipstream-ng>=1.7,<2.0
+zeroconf>=0.132,<1.0
+psutil>=6.0,<7.0
+flet==0.24.1
+httpx>=0.27,<1.0
+platformdirs>=4.2,<5.0

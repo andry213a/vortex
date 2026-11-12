@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0B0F17" />
+  <title>Vortex</title>
+  <link rel="icon" type="image/png" href="/static/img/vortex.png" />
+  <link rel="apple-touch-icon" href="/static/img/vortex.png" />
+  <link rel="stylesheet" href="/static/css/style.css" />
+</head>
+<body>
+  <svg class="sprite" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <symbol id="i-hub" viewBox="0 0 24 24"><path d="M17 16l-4-4V8.82C14.16 8.4 15 7.3 15 6c0-1.66-1.34-3-3-3S9 4.34 9 6c0 1.3.84 2.4 2 2.82V12l-4 4H3v5h5v-3.05l4-4.2 4 4.2V21h5v-5h-4z"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27A6.47 6.47 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></symbol>
+    <symbol id="i-search-off" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27A6.47 6.47 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/><path d="M2.5 2.5l19 19" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+    <symbol id="i-terminal" viewBox="0 0 24 24"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 14H4V6h16v12z"/><path d="M7.5 8.5L6.09 9.91 8.17 12l-2.08 2.09L7.5 15.5 11 12z"/><path d="M12.5 14.5H17V16h-4.5z"/></symbol>
+    <symbol id="i-login" viewBox="0 0 24 24"><path d="M11 7L9.6 8.4l2.6 2.6H2v2h10.2l-2.6 2.6L11 17l5-5-5-5zm9 12h-8v2h8c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2h-8v2h8v14z"/></symbol>
+    <symbol id="i-logout" viewBox="0 0 24 24"><path d="M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.58L17 17l5-5zM4 5h8V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H4V5z"/></symbol>
+    <symbol id="i-arrow-up" viewBox="0 0 24 24"><path d="M4 12l1.41 1.41L11 7.83V20h2V7.83l5.58 5.59L20 12l-8-8-8 8z"/></symbol>
+    <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M17.65 6.35A7.958 7.958 0 0 0 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0 1 12 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></symbol>
+    <symbol id="i-new-folder" viewBox="0 0 24 24"><path d="M20 6h-8l-2-2H4c-1.11 0-1.99.89-1.99 2L2 18c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V8c0-1.11-.89-2-2-2zm-1 8h-3v3h-2v-3h-3v-2h3V9h2v3h3v2z"/></symbol>
+    <symbol id="i-upload" viewBox="0 0 24 24"><path d="M9 16h6v-6h4l-7-7-7 7h4zm-4 2h14v2H5z"/></symbol>
+    <symbol id="i-archive" viewBox="0 0 24 24"><path d="M20.54 5.23l-1.39-1.68C18.88 3.21 18.47 3 18 3H6c-.47 0-.88.21-1.16.55L3.46 5.23C3.17 5.57 3 6.02 3 6.5V19c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V6.5c0-.48-.17-.93-.46-1.27zM12 17.5L6.5 12H10v-2h4v2h3.5L12 17.5zM5.12 5l.81-1h12l.94 1H5.12z"/></symbol>
+    <symbol id="i-home" viewBox="0 0 24 24"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></symbol>
+    <symbol id="i-folder" viewBox="0 0 24 24"><path d="M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/></symbol>
+    <symbol id="i-movie" viewBox="0 0 24 24"><path d="M18 4l2 4h-3l-2-4h-2l2 4h-3l-2-4H8l2 4H7L5 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V4h-4z"/></symbol>
+    <symbol id="i-audio" viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></symbol>
+    <symbol id="i-image" viewBox="0 0 24 24"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></symbol>
+    <symbol id="i-description" viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></symbol>
+    <symbol id="i-code" viewBox="0 0 24 24"><path d="M9.4 16.6L4.8 12l4.6-4.6L8 6l-6 6 6 6 1.4-1.4zm5.2 0l4.6-4.6-4.6-4.6L16 6l6 6-6 6-1.4-1.4z"/></symbol>
+    <symbol id="i-pdf" viewBox="0 0 24 24"><path d="M20 2H8c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-8.5 7.5c0 .83-.67 1.5-1.5 1.5H9v2H7.5V7H10c.83 0 1.5.67 1.5 1.5v1zm5 2c0 .83-.67 1.5-1.5 1.5h-2.5V7H15c.83 0 1.5.67 1.5 1.5v3zm4-3H19v1h1.5V11H19v2h-1.5V7h3v1.5zM9 9.5h1v-1H9v1zM4 6H2v14c0 1.1.9 2 2 2h14v-2H4V6zm10 5.5h1v-3h-1v3z"/></symbol>
+    <symbol id="i-article" viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/></symbol>
+    <symbol id="i-file" viewBox="0 0 24 24"><path d="M6 2c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6H6zm7 7V3.5L18.5 9H13z"/></symbol>
+    <symbol id="i-download" viewBox="0 0 24 24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></symbol>
+    <symbol id="i-edit" viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a.996.996 0 0 0 0-1.41l-2.34-2.34a.996.996 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></symbol>
+    <symbol id="i-rename" viewBox="0 0 24 24"><path d="M3 10h11v2H3zm0-2h11V6H3zm0 8h7v-2H3zm15.01-3.13l.71-.71a.996.996 0 0 1 1.41 0l.71.71c.39.39.39 1.02 0 1.41l-.71.71-2.12-2.12zm-.71.71l-5.3 5.3V21h2.12l5.3-5.3-2.12-2.12z"/></symbol>
+    <symbol id="i-delete" viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM8 9h8v10H8V9zm7.5-5l-1-1h-5l-1 1H5v2h14V4z"/></symbol>
+    <symbol id="i-close" viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></symbol>
+    <symbol id="i-remove" viewBox="0 0 24 24"><path d="M19 13H5v-2h14v2z"/></symbol>
+    <symbol id="i-crop-square" viewBox="0 0 24 24"><path d="M18 18H6V6h12v12zm2-12v12c0 1.1-.9 2-2 2H6c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2h12c1.1 0 2 .9 2 2z"/></symbol>
+    <symbol id="i-bolt" viewBox="0 0 24 24"><path d="M11 21h-1l1-7H7.5c-.58 0-.57-.32-.38-.66.19-.34.05-.08.07-.12C8.48 10.94 10.42 7.54 13 3h1l-1 7h3.5c.49 0 .56.33.47.51l-.07.15C12.96 17.55 11 21 11 21z"/></symbol>
+    <symbol id="i-cloud-upload" viewBox="0 0 24 24"><path d="M19.35 10.04A7.49 7.49 0 0 0 12 4C9.11 4 6.6 5.64 5.35 8.04A5.994 5.994 0 0 0 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13v4h-4v-4H7l5-5 5 5h-3z"/></symbol>
+    <symbol id="i-lock" viewBox="0 0 24 24"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/></symbol>
+    <symbol id="i-save" viewBox="0 0 24 24"><path d="M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z"/></symbol>
+    <symbol id="i-table" viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 4h-6V5h6v2zm-8 0H5V5h6v2zm-6 2h6v3H5V9zm8 0h6v3h-6V9zm-8 5h6v3H5v-3zm8 0h6v3h-6v-3z"/></symbol>
+    <symbol id="i-slideshow" viewBox="0 0 24 24"><path d="M21 3H3c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h8v2H8v2h8v-2h-3v-2h8c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 14H3V5h18v12zM8 15l3-4 2.2 2.8L16 10l4 5H8z"/></symbol>
+    <symbol id="i-palette" viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 0 18h1.2a2.3 2.3 0 0 0 1.7-3.8 1.2 1.2 0 0 1 .9-2h1.7A4.5 4.5 0 0 0 22 10.7C22 6.4 17.5 3 12 3zm-5 10a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zm3-4a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zm5 0a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zm3 4a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3z"/></symbol>
+    <symbol id="i-font" viewBox="0 0 24 24"><path d="M5 4v3h5.5v13h3V7H19V4H5zm14 8h-4v2h4v6h2v-8h-2z"/></symbol>
+    <symbol id="i-storage" viewBox="0 0 24 24"><path d="M4 4h16v4H4V4zm0 6h16v4H4v-4zm0 6h16v4H4v-4zm2-10v1h2V6H6zm0 6v1h2v-1H6zm0 6v1h2v-1H6z"/></symbol>
+    <symbol id="i-view-ar" viewBox="0 0 24 24"><path d="M12 2 3 7v10l9 5 9-5V7l-9-5zm0 2.3L18.7 8 12 11.7 5.3 8 12 4.3zM5 9.7l6 3.3v6.4l-6-3.3V9.7zm8 9.7V13l6-3.3v6.4l-6 3.3z"/></symbol>
+    <symbol id="i-package" viewBox="0 0 24 24"><path d="m21 8-9-5-9 5v10l9 5 9-5V8zm-9-2.7L16.7 8 12 10.6 7.3 8 12 5.3zM5 9.7l6 3.3v7.4l-6-3.3V9.7zm8 10.7V13l6-3.3v7.4l-6 3.3z"/></symbol>
+    <symbol id="i-memory" viewBox="0 0 24 24"><path d="M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2zm2 4v10h10V7H7zm2 2h2v2H9V9zm4 0h2v2h-2V9zm-4 4h2v2H9v-2zm4 0h2v2h-2v-2z"/></symbol>
+    <symbol id="i-book" viewBox="0 0 24 24"><path d="M18 2H6a3 3 0 0 0-3 3v14a3 3 0 0 0 3 3h15V5a3 3 0 0 0-3-3zM6 4h12a1 1 0 0 1 1 1v1H6a1 1 0 0 1 0-2zm0 16a1 1 0 0 1 0-2h13v2H6zm13-4H6a3 3 0 0 0-1 .2V8h14v8z"/></symbol>
+  </svg>
+
+  <div id="app" class="app hidden">
+    <header class="titlebar">
+      <div class="titlebar-drag">
+        <div class="brand">
+          <span class="brand-mark"><img class="brand-icon" src="/static/img/vortex.png" alt="Vortex" /></span>
+          <span class="brand-name">VORTEX</span>
+          <span class="brand-sep"></span>
+          <span class="brand-sub">NAS local</span>
+        </div>
+        <div id="status-pill" class="status-pill">
+          <span class="status-dot"></span>
+          <span id="status-text">EN LÍNEA</span>
+        </div>
+      </div>
+      <div class="window-controls">
+        <button id="win-minimize" class="window-btn" type="button" title="Minimizar" aria-label="Minimizar"><svg class="icon"><use href="#i-remove"></use></svg></button>
+        <button id="win-maximize" class="window-btn" type="button" title="Maximizar" aria-label="Maximizar"><svg class="icon"><use href="#i-crop-square"></use></svg></button>
+        <button id="win-close" class="window-btn close" type="button" title="Cerrar" aria-label="Cerrar"><svg class="icon"><use href="#i-close"></use></svg></button>
+      </div>
+    </header>
+
+    <header class="headerbar">
+      <span id="role-badge" class="role-badge"><span class="role-dot"></span><span id="role-label">INVITADO</span></span>
+      <div class="header-spacer"></div>
+      <div class="search-wrap">
+        <svg class="icon search-icon"><use href="#i-search"></use></svg>
+        <input id="search" class="search" type="search" placeholder="Buscar o comando…   Ctrl+K" autocomplete="off" spellcheck="false" />
+      </div>
+      <button id="btn-logs" class="icon-btn hidden" type="button" title="Consola de logs (host)" aria-label="Consola de logs"><svg class="icon"><use href="#i-terminal"></use></svg></button>
+      <button id="btn-login" class="icon-btn accent hidden" type="button" title="Iniciar sesión" aria-label="Iniciar sesión"><svg class="icon"><use href="#i-login"></use></svg></button>
+      <button id="btn-logout" class="icon-btn danger hidden" type="button" title="Cerrar sesión" aria-label="Cerrar sesión"><svg class="icon"><use href="#i-logout"></use></svg></button>
+    </header>
+
+    <div class="toolbar">
+      <button id="btn-up" class="icon-btn" type="button" title="Subir un nivel" aria-label="Subir un nivel"><svg class="icon"><use href="#i-arrow-up"></use></svg></button>
+      <button id="btn-refresh" class="icon-btn" type="button" title="Actualizar" aria-label="Actualizar"><svg class="icon"><use href="#i-refresh"></use></svg></button>
+      <button id="btn-mkdir" class="icon-btn accent" type="button" title="Nueva carpeta" aria-label="Nueva carpeta"><svg class="icon"><use href="#i-new-folder"></use></svg></button>
+      <button id="btn-upload" class="icon-btn accent" type="button" title="Subir archivos" aria-label="Subir archivos"><svg class="icon"><use href="#i-upload"></use></svg></button>
+      <button id="btn-zip" class="icon-btn accent" type="button" title="Descargar carpeta (.zip)" aria-label="Descargar carpeta"><svg class="icon"><use href="#i-archive"></use></svg></button>
+      <span class="sep"></span>
+      <nav id="breadcrumb" class="breadcrumb"></nav>
+      <span id="count" class="count"></span>
+    </div>
+
+    <main id="listing" class="listing"></main>
+
+    <div id="dropzone" class="dropzone hidden"><div>Suelta los archivos para subirlos a esta carpeta</div></div>
+  </div>
+
+  <div id="login-overlay" class="login-overlay hidden">
+    <form id="login-form" class="login-card">
+      <svg class="icon login-icon"><use href="#i-lock"></use></svg>
+      <h1>Acceso a Vortex</h1>
+      <p class="muted">Introduce la contraseña configurada en el servidor.</p>
+      <input id="login-secret" class="input" type="password" placeholder="Contraseña" autocomplete="current-password" />
+      <div id="login-error" class="error"></div>
+      <div class="login-actions">
+        <span id="login-busy" class="spinner hidden" aria-hidden="true"></span>
+        <button type="submit" class="btn primary"><svg class="icon"><use href="#i-login"></use></svg>Entrar</button>
+      </div>
+    </form>
+  </div>
+
+  <div id="modal-backdrop" class="modal-backdrop hidden">
+    <div id="modal" class="modal"></div>
+  </div>
+
+  <div id="palette" class="palette hidden">
+    <div class="palette-box">
+      <div class="palette-head"><svg class="icon"><use href="#i-bolt"></use></svg><span>HizSearch</span></div>
+      <input id="palette-input" class="palette-input" type="text" placeholder="Escribe para buscar · type:video  size:&gt;1gb  ext:pdf" autocomplete="off" spellcheck="false" />
+      <div id="palette-results" class="palette-results"></div>
+      <div class="palette-hint">[Ctrl+K] abrir · [Esc] cerrar · Enter busca en el servidor</div>
+    </div>
+  </div>
+
+  <div id="mini-vortex" class="mini hidden">
+    <div class="mini-head">
+      <span class="mini-title"><svg class="icon"><use href="#i-cloud-upload"></use></svg>Mini-Vortex</span>
+      <span id="mini-speed" class="mini-speed"></span>
+    </div>
+    <div id="mini-name" class="mini-name"></div>
+    <div class="mini-track"><div id="mini-bar" class="mini-bar"></div></div>
+  </div>
+
+  <div id="logs-overlay" class="logs-overlay hidden">
+    <div class="logs-modal">
+      <div class="logs-head">
+        <span class="logs-title"><svg class="icon"><use href="#i-terminal"></use></svg>Consola de auditoría en tiempo real</span>
+        <button id="logs-close" class="icon-btn" type="button" title="Cerrar" aria-label="Cerrar"><svg class="icon"><use href="#i-close"></use></svg></button>
+      </div>
+      <div id="logs-body" class="logs-body"></div>
+    </div>
+  </div>
+
+  <div id="toasts" class="toasts"></div>
+
+  <input id="file-input" type="file" multiple class="hidden" />
+
+  <script src="/static/js/app.js"></script>
+</body>
+</html>

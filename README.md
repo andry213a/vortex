@@ -1,0 +1,180 @@
+# VORTEX
+
+Servidor local de archivos tipo NAS ligero, multiplataforma (**Windows, Linux, Web y móvil vía navegador**), con una interfaz centrada en búsqueda y comandos inspirada en *HizSearch*. Diseñado bajo los principios de **Cero Fricción** para el usuario y **Cero Confianza (Zero Trust)** en la red local.
+
+> Este repositorio contiene la implementación completa descrita en `documento/vortex.txt`.
+
+## Características
+
+- **Backend asíncrono** con FastAPI + Uvicorn.
+- **UI de escritorio** con Flet (host del servidor y consola de logs en tiempo real).
+- **Cliente web/móvil** servido por el propio servidor, con paleta de comandos `Ctrl+K`, vista previa y editor.
+- **Búsqueda difusa** con operadores: `type:video`, `ext:pdf`, `size:>1gb`, `size:<10mb`.
+- **Subidas inteligentes**: directa para `< 100 MB` y *auto-chunking* de 10 MB para archivos grandes, con reanudación de bloques y widget flotante **Mini-Vortex**.
+- **Descargas con `Range Requests`** (seek de vídeo) y **ZIP en streaming** con `zipstream-ng` (sin disco intermedio).
+- **Autenticación tri-modal**: automática (token), manual (contraseña) o nula (LAN pública), con permisos de invitado de solo lectura o control total.
+- **Zero Trust**: protección contra *path traversal*, JWT en memoria, *rate limiting* (5 intentos / 15 min) y sin filtración de existencia de archivos a usuarios no autenticados.
+- **Auditoría JSON** con rotación (10 MB × 5) y consola en vivo solo para el host.
+- **Anuncio mDNS** para `vortex.local` en la LAN.
+- **Comprobación de puertos y permisos** con `psutil`, con *fallback* limpio si se deniega la elevación.
+- **Empaquetado** para Windows (`.exe`) y Linux con Flet + PyInstaller.
+
+## Requisitos
+
+- Python **3.10+** (recomendado 3.13).
+- Windows 10/11 o Linux (probado en Debian/Ubuntu).
+- **Linux (ventana nativa):** el cliente de escritorio de Flet requiere `libmpv.so.1`.
+  Instala la biblioteca que la proporcione (en algunas distribuciones es `libmpv1`).
+  Si no está disponible, Vortex abre automáticamente la interfaz en el navegador en lugar de fallar.
+- Para compilar en Windows, ejecutar los scripts **en Windows** (PyInstaller no genera `.exe` desde Linux).
+
+## Instalación
+
+```bash
+cd documento/vortex
+python -m venv .venv
+# Linux/macOS
+source .venv/bin/activate
+# Windows
+# .venv\Scripts\activate
+
+pip install -r requirements.txt
+```
+
+## Ejecución
+
+### Escritorio (host con UI Flet)
+
+```bash
+python run.py
+```
+
+Se abre la ventana de configuración: carpeta raíz, puerto, modo de autenticación y permisos de invitado. Al iniciar, el servidor escucha en toda la LAN y la app entra como host.
+
+La ventana nativa usa un marco propio con la paleta de Vortex: barra de título arrastrable, estado `EN LÍNEA`/`DETENIDO` y controles de minimizar, maximizar y cerrar. El cliente web omite ese marco y usa la página del navegador. En Linux, si falta `libmpv.so.1`, la interfaz se abre automáticamente en el navegador en lugar de fallar.
+
+### Servidor sin interfaz (headless)
+
+```bash
+python run.py serve --dir /ruta/a/compartir --port 8080 --auth auto
+# o también
+python -m vortex serve --dir /ruta/a/compartir --port 8080 --auth manual --password "mi-clave"
+```
+
+Opciones: `--auth auto|manual|none`, `--token`, `--password`, `--guest-write`, `--allow-guest`, `--hostname`.
+
+### Acceso desde otros dispositivos
+
+- Web: `http://vortex.local:8080` (requiere Bonjour en Windows o Avahi en Linux) o `http://IP-DEL-HOST:8080`.
+- Móvil: abre la misma URL en el navegador; la interfaz es responsive.
+- Escritorio: la app Flet actúa como host y cliente local.
+
+## Modos de autenticación
+
+| Modo | Comportamiento |
+|---|---|
+| `auto` | Genera un token corto tipo `X7-B9K2`. Se muestra en la configuración del host. |
+| `manual` | Contraseña definida por el usuario, almacenada con `passlib` (PBKDF2-SHA256). |
+| `none` | Acceso público en la LAN. Los invitados heredan los permisos configurados. |
+
+Los permisos de invitado pueden ser **Solo lectura** o **Control total** (CRUD). En modo `none`, el host local (loopback) conserva privilegios de host.
+
+## Compilación
+
+### Windows (primero)
+
+En una máquina Windows:
+
+```bat
+build\build_windows.bat
+```
+
+Genera `dist\windows\Vortex.exe` usando `flet pack`. Si falla, el script recurre al *spec* de PyInstaller:
+
+```bat
+pyinstaller build\vortex.spec --noconfirm --distpath dist\windows --workpath build\work
+```
+
+### Linux
+
+```bash
+chmod +x build/build_linux.sh
+./build/build_linux.sh
+```
+
+### Notas de empaquetado
+
+- `flet pack` incluye automáticamente el runtime de Flet. El *spec* manual recopila `flet` y `flet_desktop` con `collect_data_files`.
+- Los archivos de `vortex/static` se incluyen como datos.
+- Para un icono, coloca `build/vortex.ico` y añade `--icon build/vortex.ico`.
+
+## Estructura
+
+```
+vortex/
+├── run.py                      # Punto de entrada
+├── vortex/
+│   ├── config.py               # Configuración persistente y tokens
+│   ├── cli.py                  # CLI (escritorio / headless)
+│   ├── server.py               # Control del servidor Uvicorn en hilo
+│   ├── backend/
+│   │   ├── app.py              # Fábrica FastAPI + SPA
+│   │   ├── state.py            # Runtime compartido
+│   │   ├── auth.py             # JWT en memoria + passlib
+│   │   ├── security.py         # Path traversal, rate limit, búsqueda difusa
+│   │   ├── transfer.py         # Chunks, rangos, conflictos, ZIP
+│   │   ├── audit.py            # Logs JSON rotativos + listeners
+│   │   ├── mdns.py             # Anuncio zeroconf
+│   │   ├── system.py           # Puertos, disco, elevación
+│   │   └── routers/            # auth, files, system, logs (WS)
+│   ├── frontend/               # Interfaz Flet (host)
+│   └── static/                 # Cliente web SPA (HTML/CSS/JS)
+├── build/                      # Scripts Windows/Linux + spec
+└── tests/                      # Pruebas de seguridad y transferencias
+```
+
+## API principal
+
+| Método | Ruta | Descripción |
+|---|---|---|
+| `GET` | `/api/auth/status` | Estado público de autenticación |
+| `POST` | `/api/auth/login` | Login (token/contraseña) |
+| `GET` | `/api/auth/me` | Rol actual |
+| `GET` | `/api/files?path=` | Listar directorio |
+| `GET` | `/api/files/search` | Búsqueda difusa con filtros |
+| `GET` | `/api/files/download` | Descarga con `Range` / `?inline=1` |
+| `GET` | `/api/files/zip` | ZIP en streaming |
+| `GET` | `/api/files/read` | Leer texto para vista previa/editor |
+| `PUT` | `/api/files/write` | Guardar texto |
+| `POST` | `/api/files/mkdir` | Crear carpeta |
+| `PUT` | `/api/files/rename` | Renombrar |
+| `DELETE` | `/api/files?path=` | Eliminar |
+| `POST` | `/api/files/upload` | Subida directa (multipart) |
+| `POST` | `/api/files/upload/init` | Iniciar subida por bloques |
+| `PUT` | `/api/files/upload/{id}/{index}` | Enviar bloque |
+| `GET` | `/api/files/upload/{id}` | Estado/reanudación |
+| `POST` | `/api/files/upload/{id}/complete` | Finalizar |
+| `GET` | `/api/system/info` | Disco, plataforma, uptime |
+| `GET` | `/api/system/port-check` | Comprobar puerto |
+| `WS` | `/api/ws/logs?token=` | Logs en vivo (host) |
+
+## Seguridad
+
+- Toda ruta se resuelve con `pathlib.Path.resolve()` y se valida con `is_relative_to(base_dir)`; si escapa, `403` inmediato y evento `PATH_TRAVERSAL`.
+- La autenticación se evalúa **antes** de resolver rutas: nunca se confirma ni niega la existencia de archivos a usuarios no autenticados.
+- Los enlaces profundos (`/descargar/...`) los intercepta el cliente web: guarda la ruta, muestra el login y, tras autenticar, descarga. El backend no expone información.
+- JWT firmados con secreto efímero y `jti` en memoria; al reiniciar el servidor las sesiones caducan.
+- *Rate limiting* por IP: 5 intentos fallidos → bloqueo 15 minutos (eventos `LOGIN_FAILED` y `RATE_LIMIT_BLOCK`).
+- Los binarios/scripts subidos nunca se ejecutan; se sirven con `X-Content-Type-Options: nosniff` y extensión forzada a descarga para HTML/SVG/JS.
+- Auditoría JSON con los campos `timestamp, event_id, severity, client_ip, user_agent, action, target_path, status_code, details`.
+
+## Pruebas
+
+```bash
+pip install -r requirements-dev.txt
+pytest -q
+```
+
+## Licencia
+
+MIT.

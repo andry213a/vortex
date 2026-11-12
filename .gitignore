@@ -1,0 +1,14 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.env
+build/dist/
+dist/
+.vortex-data/
+.pytest_cache/
+.ruff_cache/
+*.spec.bak
+*.log
+build/work/
