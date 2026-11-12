@@ -1214,6 +1214,9 @@ class VortexUI:
         except (ServerStartError, ValueError) as exc:
             self._notify(str(exc), True)
             return
+        except Exception as exc:
+            self._notify(f"No se pudo iniciar el servidor ({type(exc).__name__}): {exc}", True)
+            return
         self.config = cfg
         self.is_remote = False
         try:
@@ -1573,7 +1576,7 @@ class VortexUI:
                 width=560,
                 content=ft.Column(
                     [
-                        ft.Text("En otro equipo conectado a la misma red Wi-Fi, abre esta dirección IP:", color=MUTED, size=13),
+                        ft.Text("En otro equipo conectado a la misma red, abre esta dirección IP:", color=MUTED, size=13),
                         ft.Row(
                             [
                                 ft.Container(
@@ -1596,7 +1599,7 @@ class VortexUI:
                                     content=ft.Column(
                                         [
                                             ft.Text("Escanea para conectarte", color=ACCENT, size=14, weight=ft.FontWeight.W_600),
-                                            ft.Text("Dirección IP", color=MUTED, size=11),
+                                            ft.Text("IP del entorno donde corre Vortex", color=MUTED, size=11),
                                             ft.Text(ip_url, color=TEXT, size=14, selectable=True, font_family="monospace"),
                                             ft.Divider(color=BORDER, height=8),
                                             ft.Text("Nombre mDNS (puede no funcionar en ChromeOS)", color=MUTED, size=11),
@@ -1610,7 +1613,10 @@ class VortexUI:
                             vertical_alignment=ft.CrossAxisAlignment.CENTER,
                         ),
                         ft.Text(
-                            "Al escanear, el dispositivo abrirá esta dirección en la red local. Inicia sesión con el token o la contraseña configurados en Vortex.",
+                            "Los invitados tienen control total sin iniciar sesión. Si Vortex corre en el Linux "
+                            "de un Chromebook, esta IP puede ser solo del contenedor: habilita el reenvío "
+                            f"TCP del puerto {port} en Configuración > Desarrolladores > Linux > Reenvío "
+                            "de puertos y, desde el otro dispositivo, usa la IP Wi-Fi del Chromebook.",
                             color=MUTED,
                             size=12,
                         ),

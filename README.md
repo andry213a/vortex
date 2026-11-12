@@ -69,6 +69,9 @@ Opciones: `--auth auto|manual|none`, `--token`, `--password`, `--hostname`.
 - Web: `http://vortex.local:8080` (requiere Bonjour en Windows o Avahi en Linux) o `http://IP-DEL-HOST:8080`.
 - Móvil: abre la misma URL en el navegador; la interfaz es responsive.
 - Escritorio: la app Flet actúa como host y cliente local.
+- En Chromebook, si Vortex corre en el entorno Linux, habilita el reenvío TCP del puerto del servidor en
+  **Configuración > Desarrolladores > Linux > Reenvío de puertos**. Desde otros dispositivos usa la IP
+  Wi-Fi del Chromebook, no la IP interna del contenedor.
 
 ## Modos de autenticación
 
