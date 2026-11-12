@@ -129,6 +129,8 @@ class VortexUI:
         self.upload_cancel_button: ft.IconButton | None = None
         self.upload_cancellable = False
         self.upload_target_path = ""
+        self.file_revision = 0
+        self.file_sync_checked_at = 0.0
         self.listing = None
         self.breadcrumb = None
         self.count_text = None
@@ -900,6 +902,8 @@ class VortexUI:
             return
         self.http = client
         self.base_url = remote_url
+        self.file_revision = 0
+        self.file_sync_checked_at = 0.0
         self.is_remote = True
         self.token = None
         self.role = None
@@ -1246,6 +1250,8 @@ class VortexUI:
             pass
         self.base_url = f"http://127.0.0.1:{cfg.port}"
         self.http = httpx.Client(base_url=self.base_url, timeout=httpx.Timeout(120.0, read=None))
+        self.file_revision = 0
+        self.file_sync_checked_at = 0.0
         self.log_buffer.clear()
         self.log_unsubscribe = runtime.audit.add_listener(self._audit_listener)
         self._start_polling()
@@ -1265,6 +1271,7 @@ class VortexUI:
             try:
                 self._refresh_discovered_servers()
                 self._refresh_upload_widget()
+                await self._sync_file_changes()
                 if self.remote_download_notice is not None:
                     message, is_error = self.remote_download_notice
                     self.remote_download_notice = None
@@ -1274,6 +1281,48 @@ class VortexUI:
             except Exception:
                 pass
             await asyncio.sleep(0.4)
+
+    async def _sync_file_changes(self) -> None:
+        if self.http is None or time.monotonic() - self.file_sync_checked_at < 1.0:
+            return
+        self.file_sync_checked_at = time.monotonic()
+        try:
+            response = await asyncio.to_thread(
+                self.http.get,
+                "/api/system/changes",
+                params={"since": self.file_revision},
+                headers=self._auth_headers(),
+                timeout=2.5,
+            )
+        except httpx.HTTPError:
+            return
+        if response.status_code != 200:
+            return
+        try:
+            data = response.json()
+        except ValueError:
+            return
+        changes = data.get("changes") or []
+        self.file_revision = int(data.get("revision", self.file_revision))
+        if not changes:
+            return
+        path = self.current_path
+        refresh = False
+        for change in changes:
+            removed = change.get("removed")
+            if removed and (path == removed or path.startswith(removed + "/")):
+                path = removed.rpartition("/")[0]
+                refresh = True
+            renamed = change.get("renamed")
+            if renamed:
+                old = renamed.get("from", "")
+                if old and (path == old or path.startswith(old + "/")):
+                    path = renamed.get("to", "") + path[len(old):]
+                    refresh = True
+            if path in (change.get("paths") or []):
+                refresh = True
+        if refresh:
+            self.refresh_listing(path)
 
     def _enter_app(self) -> None:
         if self._auto_login():

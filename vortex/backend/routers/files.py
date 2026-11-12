@@ -398,7 +398,14 @@ def rename_path(
         target.rename(destination)
     except OSError as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
-    _audit(runtime, request, "FILE_RENAME", runtime.relative(destination), 200, {"from": payload.path, "to": name})
+    _audit(
+        runtime,
+        request,
+        "FILE_RENAME",
+        runtime.relative(destination),
+        200,
+        {"from": payload.path, "to": name, "is_dir": destination.is_dir()},
+    )
     return _make_item(runtime, destination)
 
 
@@ -416,6 +423,7 @@ def delete_path(
     if not target.exists():
         raise HTTPException(status_code=404, detail="La ruta no existe")
     relative = runtime.relative(target)
+    is_dir = target.is_dir()
     try:
         if target.is_dir():
             shutil.rmtree(target)
@@ -423,7 +431,7 @@ def delete_path(
             target.unlink()
     except OSError as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
-    _audit(runtime, request, "FILE_DELETE", relative, 200)
+    _audit(runtime, request, "FILE_DELETE", relative, 200, {"is_dir": is_dir})
     return {"ok": True}
 
 

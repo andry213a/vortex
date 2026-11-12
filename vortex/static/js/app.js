@@ -18,7 +18,10 @@
     searchTimer: null,
     paletteTimer: null,
     uploadTotal: 0,
-    uploadDone: 0
+    uploadDone: 0,
+    fileRevision: 0,
+    fileSyncTimer: null,
+    fileSyncBusy: false
   };
 
   var KIND_ICONS = {
@@ -299,6 +302,49 @@
     }
     setRoleBadge();
     await routeFromLocation();
+    startFileSync();
+  }
+
+  function startFileSync() {
+    if (state.fileSyncTimer) clearInterval(state.fileSyncTimer);
+    state.fileSyncBusy = false;
+    pollFileChanges();
+    state.fileSyncTimer = setInterval(pollFileChanges, 1000);
+  }
+
+  async function pollFileChanges() {
+    if (state.fileSyncBusy || document.hidden) return;
+    state.fileSyncBusy = true;
+    try {
+      var data = await api("/api/system/changes?since=" + state.fileRevision);
+      var changes = data.changes || [];
+      state.fileRevision = Number(data.revision) || 0;
+      if (!changes.length) return;
+
+      var path = state.currentPath;
+      var refresh = false;
+      changes.forEach(function (change) {
+        if (change.removed && (path === change.removed || path.indexOf(change.removed + "/") === 0)) {
+          path = change.removed.indexOf("/") >= 0 ? change.removed.slice(0, change.removed.lastIndexOf("/")) : "";
+          refresh = true;
+        }
+        if (change.renamed && (path === change.renamed.from || path.indexOf(change.renamed.from + "/") === 0)) {
+          path = change.renamed.to + path.slice(change.renamed.from.length);
+          refresh = true;
+        }
+        if ((change.paths || []).indexOf(path) >= 0) refresh = true;
+      });
+      if (refresh) {
+        try {
+          history.replaceState({ path: path }, "", browseUrl(path));
+        } catch (err) {}
+        await loadDir(path, false);
+      }
+    } catch (err) {
+      if (err.status !== 401 && err.status !== 404) setStatus(false);
+    } finally {
+      state.fileSyncBusy = false;
+    }
   }
 
   async function routeFromLocation() {

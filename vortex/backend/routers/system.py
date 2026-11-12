@@ -11,6 +11,15 @@ from ..system import disk_usage, platform_info, port_in_use, suggest_free_port, 
 router = APIRouter()
 
 
+@router.get("/changes")
+def file_changes(
+    since: int = Query(0, ge=0),
+    access: Access = Depends(require_read),
+    runtime: Runtime = Depends(get_runtime),
+) -> dict:
+    return runtime.file_changes_since(since)
+
+
 @router.get("/info", response_model=SystemInfoResponse)
 def info(access: Access = Depends(require_read), runtime: Runtime = Depends(get_runtime)) -> SystemInfoResponse:
     usage = disk_usage(runtime.base_dir)
