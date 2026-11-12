@@ -670,8 +670,6 @@ class VortexUI:
             on_click=self._regenerate_token,
         )
         self.password_field = self._field("Contraseña", password=True, can_reveal_password=True, expand=True)
-        self.guest_switch = ft.Switch(label="Permitir invitados", value=self.config.allow_guest, active_color=ACCENT)
-        self.guest_write_switch = ft.Switch(label="Invitados con control total", value=self.config.guest_write, active_color=ACCENT)
         self.setup_error = ft.Text("", color=DANGER, size=12)
         self.auth_extra = ft.Column(spacing=8, controls=[])
         self._render_auth_extra()
@@ -721,12 +719,9 @@ class VortexUI:
                 ft.Row([self.port_field, self.auth_dropdown], spacing=16),
                 self.auth_extra,
                 ft.Divider(color=BORDER),
-                ft.Text("Permisos de invitado", size=12, color=MUTED, weight=ft.FontWeight.W_600),
-                self.guest_switch,
-                self.guest_write_switch,
                 self.setup_error,
                 ft.Row([ft.Container(expand=True), start_button]),
-                ft.Text("El servidor escuchará en toda la LAN. Protege el acceso con token o contraseña.", size=11, color=MUTED),
+                ft.Text("El servidor escucha en toda la LAN; los invitados siempre tienen control total.", size=11, color=MUTED),
                 ft.Divider(color=BORDER),
                 ft.Row(
                     [
@@ -1130,8 +1125,6 @@ class VortexUI:
             auth_mode=self.auth_dropdown.value,
             auto_token=(self.token_field.value or "").strip() or generate_auto_token(),
             password_hash=self.config.password_hash,
-            guest_write=bool(self.guest_write_switch.value),
-            allow_guest=bool(self.guest_switch.value),
             hostname=self.config.hostname,
             chunk_size=self.config.chunk_size,
             direct_upload_limit=self.config.direct_upload_limit,

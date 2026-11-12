@@ -52,15 +52,21 @@ class ServerConfig:
     auth_mode: str = "auto"
     auto_token: str = field(default_factory=generate_auto_token)
     password_hash: str = ""
-    guest_write: bool = False
-    allow_guest: bool = False
+    guest_write: bool = True
+    allow_guest: bool = True
     hostname: str = "vortex.local"
     chunk_size: int = DEFAULT_CHUNK_SIZE
     direct_upload_limit: int = DIRECT_UPLOAD_LIMIT
     manual_password: str = ""
     accent_color: str = "#60A5FA"
 
+    def __post_init__(self) -> None:
+        self.allow_guest = True
+        self.guest_write = True
+
     def validate(self) -> None:
+        self.allow_guest = True
+        self.guest_write = True
         if self.auth_mode not in AUTH_MODES:
             raise ValueError(f"Modo de autenticación inválido: {self.auth_mode}")
         if not isinstance(self.port, int) or not 1 <= self.port <= 65535:

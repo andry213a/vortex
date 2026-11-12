@@ -12,7 +12,8 @@ Servidor local de archivos tipo NAS ligero, multiplataforma (**Windows, Linux, W
 - **Búsqueda difusa** con operadores: `type:video`, `ext:pdf`, `size:>1gb`, `size:<10mb`.
 - **Subidas inteligentes**: directa para `< 100 MB` y *auto-chunking* de 10 MB para archivos grandes, con reanudación de bloques y widget flotante **Mini-Vortex**.
 - **Descargas con `Range Requests`** (seek de vídeo) y **ZIP en streaming** con `zipstream-ng` (sin disco intermedio).
-- **Autenticación tri-modal**: automática (token), manual (contraseña) o nula (LAN pública), con permisos de invitado de solo lectura o control total.
+- **Acceso de invitados siempre activo**: cualquier invitado en la LAN obtiene control total sobre los archivos y carpetas compartidos.
+- **Autenticación del host**: automática (token), manual (contraseña) o nula (LAN pública).
 - **Zero Trust**: protección contra *path traversal*, JWT en memoria, *rate limiting* (5 intentos / 15 min) y sin filtración de existencia de archivos a usuarios no autenticados.
 - **Auditoría JSON** con rotación (10 MB × 5) y consola en vivo solo para el host.
 - **Anuncio mDNS** para `vortex.local` en la LAN.
@@ -49,7 +50,7 @@ pip install -r requirements.txt
 python run.py
 ```
 
-Se abre la ventana de configuración: carpeta raíz, puerto, modo de autenticación y permisos de invitado. Al iniciar, el servidor escucha en toda la LAN y la app entra como host.
+Se abre la ventana de configuración: carpeta raíz, puerto y modo de autenticación del host. Los invitados siempre tienen control total sobre el contenido compartido. Al iniciar, el servidor escucha en toda la LAN y la app entra como host.
 
 La ventana nativa usa un marco propio con la paleta de Vortex: barra de título arrastrable, estado `EN LÍNEA`/`DETENIDO` y controles de minimizar, maximizar y cerrar. El cliente web omite ese marco y usa la página del navegador. En Linux, si falta `libmpv.so.1`, la interfaz se abre automáticamente en el navegador en lugar de fallar.
 
@@ -61,7 +62,7 @@ python run.py serve --dir /ruta/a/compartir --port 8080 --auth auto
 python -m vortex serve --dir /ruta/a/compartir --port 8080 --auth manual --password "mi-clave"
 ```
 
-Opciones: `--auth auto|manual|none`, `--token`, `--password`, `--guest-write`, `--allow-guest`, `--hostname`.
+Opciones: `--auth auto|manual|none`, `--token`, `--password`, `--hostname`.
 
 ### Acceso desde otros dispositivos
 
@@ -73,11 +74,11 @@ Opciones: `--auth auto|manual|none`, `--token`, `--password`, `--guest-write`, `
 
 | Modo | Comportamiento |
 |---|---|
-| `auto` | Genera un token corto tipo `X7-B9K2`. Se muestra en la configuración del host. |
-| `manual` | Contraseña definida por el usuario, almacenada con `passlib` (PBKDF2-SHA256). |
-| `none` | Acceso público en la LAN. Los invitados heredan los permisos configurados. |
+| `auto` | El host usa un token corto tipo `X7-B9K2`, mostrado en su configuración. |
+| `manual` | El host usa una contraseña definida por el usuario, almacenada con `passlib` (PBKDF2-SHA256). |
+| `none` | El host no usa credenciales; el acceso sigue limitado a la LAN. |
 
-Los permisos de invitado pueden ser **Solo lectura** o **Control total** (CRUD). En modo `none`, el host local (loopback) conserva privilegios de host.
+Los invitados siempre pueden leer, crear, editar, renombrar y borrar archivos y carpetas dentro de la raíz compartida. El token o contraseña protege el acceso administrativo del host; no restringe a los invitados. En modo `none`, el host local (loopback) conserva privilegios de host.
 
 ## Compilación
 

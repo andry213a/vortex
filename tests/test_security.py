@@ -30,7 +30,7 @@ def test_path_traversal_is_audited(app_bundle, auth_headers):
     assert any(record["action"] == "PATH_TRAVERSAL" and record["severity"] == "SECURITY" for record in records)
 
 
-def test_read_only_guest_cannot_write(tmp_path, base_dir, monkeypatch):
+def test_guests_always_have_control_total_even_for_legacy_config(tmp_path, base_dir, monkeypatch):
     from fastapi.testclient import TestClient
 
     from vortex.backend.app import create_app
@@ -43,15 +43,19 @@ def test_read_only_guest_cannot_write(tmp_path, base_dir, monkeypatch):
         base_dir=str(base_dir),
         port=8098,
         auth_mode="none",
+        allow_guest=False,
         guest_write=False,
     )
     app = create_app(config)
     with TestClient(app) as client:
+        status = client.get("/api/auth/status").json()
+        assert status["allow_guest"] is True
+        assert status["guest_write"] is True
         listing = client.get("/api/files", params={"path": ""})
         assert listing.status_code == 200
-        response = client.post("/api/files/mkdir", json={"path": "", "name": "prohibida"})
-        assert response.status_code == 403
-        assert not (base_dir / "prohibida").exists()
+        response = client.post("/api/files/mkdir", json={"path": "", "name": "permitida"})
+        assert response.status_code == 201
+        assert (base_dir / "permitida").is_dir()
 
 
 def test_rate_limiter_status_does_not_deadlock():
@@ -68,7 +72,7 @@ def test_rate_limiter_status_does_not_deadlock():
     assert limiter.status("10.0.0.1")["blocked"] is False
 
 
-def test_guest_write_allows_writes(tmp_path, base_dir, monkeypatch):
+def test_guests_can_write_by_default(tmp_path, base_dir, monkeypatch):
     from fastapi.testclient import TestClient
 
     from vortex.backend.app import create_app
@@ -81,7 +85,6 @@ def test_guest_write_allows_writes(tmp_path, base_dir, monkeypatch):
         base_dir=str(base_dir),
         port=8095,
         auth_mode="none",
-        guest_write=True,
     )
     app = create_app(config)
     with TestClient(app) as client:

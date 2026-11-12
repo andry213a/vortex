@@ -15,8 +15,6 @@ def _serve_parser() -> argparse.ArgumentParser:
     parser.add_argument("--token", default="", help="Token para el modo automático")
     parser.add_argument("--password", default="", help="Contraseña para el modo manual")
     parser.add_argument("--hostname", default="vortex.local", help="Nombre mDNS")
-    parser.add_argument("--guest-write", action="store_true", help="Los invitados pueden escribir")
-    parser.add_argument("--allow-guest", action="store_true", help="Permitir acceso sin credenciales")
     return parser
 
 
@@ -30,8 +28,6 @@ def _config_from_args(args: argparse.Namespace) -> ServerConfig:
         auth_mode=args.auth,
         auto_token=args.token or generate_auto_token(),
         hostname=args.hostname,
-        guest_write=bool(args.guest_write),
-        allow_guest=bool(args.allow_guest),
     )
     if args.auth == "manual":
         if not args.password:
@@ -74,8 +70,6 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--token", default="", help="Token del modo automático")
     parser.add_argument("--password", default="", help="Contraseña del modo manual")
     parser.add_argument("--hostname", default="vortex.local", help="Nombre mDNS")
-    parser.add_argument("--guest-write", action="store_true")
-    parser.add_argument("--allow-guest", action="store_true")
     args = parser.parse_args(argv)
     if args.headless:
         if not args.dir:
