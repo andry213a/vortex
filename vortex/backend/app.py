@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from pathlib import Path
-
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
@@ -9,10 +7,11 @@ from fastapi.staticfiles import StaticFiles
 
 from .. import __version__
 from ..config import ServerConfig
+from ..resources import static_dir
 from .routers import auth, files, logs, system
 from .state import Runtime
 
-STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
+STATIC_DIR = static_dir()
 
 
 def create_app(config: ServerConfig, runtime: Runtime | None = None) -> FastAPI:

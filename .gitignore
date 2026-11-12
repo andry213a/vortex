@@ -2,6 +2,7 @@ __pycache__/
 *.py[cod]
 *.egg-info/
 .venv/
+.venv-win/
 venv/
 .env
 build/dist/
@@ -12,3 +13,5 @@ dist/
 *.spec.bak
 *.log
 build/work/
+build/work-*/
+build/linux-package/

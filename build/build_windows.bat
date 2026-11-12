@@ -6,23 +6,34 @@ echo ============================================
 echo  VORTEX - Compilacion para Windows
 echo ============================================
 
-if not exist ".venv" (
-    echo Creando entorno virtual...
-    py -3 -m venv .venv 2>nul || python -m venv .venv
+set "PYTHON=python"
+where py >nul 2>nul
+if not errorlevel 1 set "PYTHON=py -3"
+
+if not exist ".venv-win" (
+    echo Creando entorno virtual de compilacion...
+    %PYTHON% -m venv .venv-win
+    if errorlevel 1 (
+        echo No se encontro Python 3.10+ para crear el entorno.
+        exit /b 1
+    )
 )
 
-call ".venv\Scripts\activate.bat"
+call ".venv-win\Scripts\activate.bat"
 python -m pip install --upgrade pip
 pip install -r requirements-dev.txt
+if errorlevel 1 (
+    echo No se pudieron instalar las dependencias.
+    exit /b 1
+)
 
 echo.
-echo Empaquetando con Flet + PyInstaller...
-flet pack run.py --name Vortex --icon build\vortex.ico --add-data "vortex/static;vortex/static" --distpath dist\windows
-
+echo Empaquetando con PyInstaller (spec de Vortex)...
+python -m PyInstaller build\vortex.spec --noconfirm --clean --distpath dist\windows --workpath build\work-windows
 if errorlevel 1 (
     echo.
-    echo Fallo flet pack. Intentando con el spec de PyInstaller...
-    pyinstaller build\vortex.spec --noconfirm --distpath dist\windows --workpath build\work
+    echo Fallo el empaquetado de Windows.
+    exit /b 1
 )
 
 echo.

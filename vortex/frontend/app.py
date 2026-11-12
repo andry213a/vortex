@@ -26,6 +26,7 @@ from ..backend.mdns import local_ip
 from ..backend.security import file_kind
 from ..backend.system import needs_elevation, relaunch_elevated, suggest_free_port, validate_port
 from ..config import ConfigStore, ServerConfig, app_data_dir, generate_auto_token
+from ..resources import static_file
 from ..server import ServerController, ServerStartError
 from .theme import (
     ACCENT,
@@ -441,12 +442,14 @@ class VortexUI:
 
     @staticmethod
     def _brand_asset_path(filename: str = "vortex.png") -> Path:
-        return Path(__file__).resolve().parents[1] / "static" / "img" / filename
+        return static_file("img", filename)
 
     @classmethod
-    def _brand_image(cls, size: int) -> ft.Image:
-        logo_path = cls._brand_asset_path()
-        encoded_logo = base64.b64encode(logo_path.read_bytes()).decode("ascii")
+    def _brand_image(cls, size: int) -> ft.Control:
+        try:
+            encoded_logo = base64.b64encode(cls._brand_asset_path().read_bytes()).decode("ascii")
+        except OSError:
+            return ft.Icon(name=ft.icons.BOLT, size=max(16, size - 6), color=ACCENT)
         return ft.Image(
             src_base64=encoded_logo,
             width=size,
@@ -708,6 +711,12 @@ class VortexUI:
             bgcolor=ACCENT_STRONG,
             color="#FFFFFF",
             height=46,
+            width=200,
+            style=ft.ButtonStyle(
+                shape=ft.RoundedRectangleBorder(radius=10),
+                elevation=0,
+                padding=ft.padding.symmetric(horizontal=22, vertical=12),
+            ),
             on_click=self._start_server,
         )
 
@@ -720,8 +729,19 @@ class VortexUI:
                 self.auth_extra,
                 ft.Divider(color=BORDER),
                 self.setup_error,
-                ft.Row([ft.Container(expand=True), start_button]),
-                ft.Text("El servidor escucha en toda la LAN; los invitados siempre tienen control total.", size=11, color=MUTED),
+                ft.Row(
+                    [
+                        ft.Text(
+                            "El servidor escucha en toda la LAN; los invitados siempre tienen control total.",
+                            size=11,
+                            color=MUTED,
+                            expand=True,
+                        ),
+                        start_button,
+                    ],
+                    spacing=16,
+                    vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                ),
                 ft.Divider(color=BORDER),
                 ft.Row(
                     [
@@ -1318,7 +1338,19 @@ class VortexUI:
                 error_text.value = "Credenciales inválidas o bloqueo temporal por intentos fallidos"
                 self.page.update()
 
+        def continue_as_guest(e: ft.ControlEvent | None = None) -> None:
+            self.token = None
+            self.role = "guest_write"
+            if self.http is not None:
+                self.http.headers.pop("Authorization", None)
+            self.show_browser()
+
         password.on_submit = attempt
+        secondary_action = (
+            ft.TextButton("Cancelar", on_click=self._cancel_remote_login)
+            if self.is_remote and self.remote_requires_login
+            else ft.OutlinedButton("Continuar como invitado", on_click=continue_as_guest)
+        )
         card = self._card(
             ft.Column(
                 [
@@ -1341,11 +1373,12 @@ class VortexUI:
                     error_text,
                     ft.Row(
                         [
-                            ft.TextButton("Cancelar", on_click=self._cancel_remote_login) if self.is_remote else ft.Container(),
+                            secondary_action,
                             busy,
                             ft.Container(expand=True),
                             ft.ElevatedButton("Entrar", icon=ft.icons.LOGIN, bgcolor=ACCENT_STRONG, color="#FFFFFF", on_click=attempt),
-                        ]
+                        ],
+                        vertical_alignment=ft.CrossAxisAlignment.CENTER,
                     ),
                 ],
                 spacing=14,
@@ -1454,6 +1487,15 @@ class VortexUI:
                 )
             )
         else:
+            if self.config.auth_mode != "none" and self.role != "host":
+                header_actions.append(
+                    ft.IconButton(
+                        icon=ft.icons.LOGIN,
+                        icon_color=ACCENT,
+                        tooltip="Iniciar sesión como anfitrión",
+                        on_click=lambda e: self.show_login(),
+                    )
+                )
             header_actions.extend(
                 [
                     ft.TextButton(text="Acceso LAN", icon=ft.icons.WIFI_TETHERING, tooltip="Cómo entrar desde la red local", on_click=self._show_lan_help),
@@ -1496,6 +1538,7 @@ class VortexUI:
                     ft.IconButton(icon=ft.icons.ARROW_UPWARD, icon_color=MUTED, tooltip="Subir", on_click=self._go_up),
                     ft.IconButton(icon=ft.icons.REFRESH, icon_color=MUTED, tooltip="Actualizar", on_click=lambda e: self.refresh_listing(self.current_path)),
                     ft.IconButton(icon=ft.icons.CREATE_NEW_FOLDER_OUTLINED, icon_color=ACCENT, tooltip="Nueva carpeta", on_click=self._new_folder),
+                    ft.IconButton(icon=ft.icons.NOTE_ADD_OUTLINED, icon_color=ACCENT, tooltip="Escribir texto y crear .txt", on_click=self._new_text_file),
                     ft.IconButton(icon=ft.icons.UPLOAD_FILE, icon_color=ACCENT, tooltip="Subir archivos", on_click=self._pick_upload),
                     ft.IconButton(icon=ft.icons.ARCHIVE, icon_color=ACCENT, tooltip="Descargar carpeta (.zip)", on_click=self._download_zip),
                     ft.VerticalDivider(width=1, color=BORDER),
@@ -2123,6 +2166,58 @@ class VortexUI:
             actions=[
                 ft.TextButton("Cancelar", on_click=lambda ev: self.page.close(dialog)),
                 ft.ElevatedButton("Crear", icon=ft.icons.CREATE_NEW_FOLDER, bgcolor=ACCENT_STRONG, color="#FFFFFF", on_click=create),
+            ],
+            actions_alignment=ft.MainAxisAlignment.END,
+        )
+        self.page.open(dialog)
+
+    def _new_text_file(self, e: ft.ControlEvent) -> None:
+        name_field = self._field("Nombre del archivo", "texto", autofocus=True)
+        content_field = self._field(
+            "Escribe tu texto",
+            multiline=True,
+            min_lines=10,
+            max_lines=18,
+            text_style=ft.TextStyle(font_family="monospace", size=13),
+            expand=True,
+        )
+
+        def save(ev: ft.ControlEvent) -> None:
+            name = (name_field.value or "").strip()
+            if name.lower().endswith(".txt"):
+                name = name[:-4]
+            if not name or name in {".", ".."} or any(char in name for char in ("/", "\\", "\x00")):
+                self._notify("Escribe un nombre válido, sin rutas ni barras.", True)
+                return
+            filename = f"{name}.txt"
+            listing = self._request("GET", "/api/files", params={"path": self.current_path})
+            if listing is None:
+                return
+            if any(item.get("name", "").casefold() == filename.casefold() for item in listing.get("items", [])):
+                self._notify(f"Ya existe «{filename}» en esta carpeta.", True)
+                return
+            path = f"{self.current_path}/{filename}".lstrip("/")
+            result = self._request(
+                "PUT",
+                "/api/files/write",
+                json={"path": path, "content": content_field.value or ""},
+            )
+            if result is not None:
+                self.page.close(dialog)
+                self._notify(f"{filename} creado")
+                self.refresh_listing(self.current_path)
+
+        dialog = ft.AlertDialog(
+            modal=True,
+            title=ft.Text("Escribir archivo de texto", color=TEXT, size=16),
+            content=ft.Container(
+                width=640,
+                height=390,
+                content=ft.Column([name_field, content_field], spacing=14, expand=True),
+            ),
+            actions=[
+                ft.TextButton("Cancelar", on_click=lambda ev: self.page.close(dialog)),
+                ft.ElevatedButton("Crear .txt", icon=ft.icons.SAVE, bgcolor=ACCENT_STRONG, color="#FFFFFF", on_click=save),
             ],
             actions_alignment=ft.MainAxisAlignment.END,
         )

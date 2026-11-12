@@ -11,6 +11,7 @@ from .backend.mdns import local_ip
 from .backend.state import Runtime
 from .backend.system import validate_port
 from .config import ServerConfig
+from .stdstreams import ensure_standard_streams
 
 
 class ServerStartError(Exception):
@@ -29,6 +30,7 @@ class ServerController:
         return self.server is not None and self.thread is not None and self.thread.is_alive()
 
     def start(self, config: ServerConfig, wait_timeout: float = 20.0) -> Runtime:
+        ensure_standard_streams()
         with self._lock:
             if self.running:
                 raise ServerStartError("El servidor ya está en ejecución")
@@ -90,6 +92,7 @@ class ServerController:
 
 
 def run_headless(config: ServerConfig) -> None:
+    ensure_standard_streams()
     config.validate()
     validate_port(config.port)
     app = create_app(config)

@@ -93,10 +93,10 @@ En una máquina Windows:
 build\build_windows.bat
 ```
 
-Genera `dist\windows\Vortex.exe` usando `flet pack`. Si falla, el script recurre al *spec* de PyInstaller:
+Genera `dist\windows\Vortex.exe` con PyInstaller (`build\vortex.spec`) en el entorno `.venv-win`:
 
 ```bat
-pyinstaller build\vortex.spec --noconfirm --distpath dist\windows --workpath build\work
+python -m PyInstaller build\vortex.spec --noconfirm --clean --distpath dist\windows --workpath build\work-windows
 ```
 
 ### Linux
@@ -108,9 +108,16 @@ chmod +x build/build_linux.sh
 
 ### Notas de empaquetado
 
-- `flet pack` incluye automáticamente el runtime de Flet. El *spec* manual recopila `flet` y `flet_desktop` con `collect_data_files`.
-- Los archivos de `vortex/static` se incluyen como datos.
-- Para un icono, coloca `build/vortex.ico` y añade `--icon build/vortex.ico`.
+- El *spec* de PyInstaller incluye el cliente de escritorio de Flet y recopila los módulos de
+  `uvicorn`, `zeroconf`, `jose`, `passlib`, `zipstream`, `psutil`, `fastapi` y `starlette`.
+- Los archivos de `vortex/static` se incluyen como datos y se localizan con
+  `vortex.resources.resource_path`, tanto en desarrollo como dentro del ejecutable.
+- No ejecutes `flet pack` desde la raíz del repositorio: elimina el directorio `build/` completo,
+  que contiene los scripts, iconos y el propio *spec*.
+- En el ejecutable de Windows sin consola, `sys.stdout`/`sys.stderr` pueden ser `None`. Vortex los
+  redirige a `nul` antes de iniciar uvicorn para evitar el error
+  `Unable to configure formatter 'default'`.
+- El icono de Windows está en `build/vortex.ico`.
 
 ## Estructura
 
@@ -121,6 +128,8 @@ vortex/
 │   ├── config.py               # Configuración persistente y tokens
 │   ├── cli.py                  # CLI (escritorio / headless)
 │   ├── server.py               # Control del servidor Uvicorn en hilo
+│   ├── resources.py            # Rutas de assets (desarrollo y ejecutable)
+│   ├── stdstreams.py           # stdout/stderr seguros sin consola
 │   ├── backend/
 │   │   ├── app.py              # Fábrica FastAPI + SPA
 │   │   ├── state.py            # Runtime compartido

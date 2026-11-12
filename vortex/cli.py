@@ -5,6 +5,7 @@ import sys
 from pathlib import Path
 
 from .config import AUTH_MODES, ServerConfig, generate_auto_token
+from .stdstreams import ensure_standard_streams
 
 
 def _serve_parser() -> argparse.ArgumentParser:
@@ -57,6 +58,7 @@ def _run_serve(args: argparse.Namespace) -> None:
 
 
 def main(argv: list[str] | None = None) -> None:
+    ensure_standard_streams()
     argv = list(sys.argv[1:] if argv is None else argv)
     if argv and argv[0] in {"serve", "headless"}:
         args = _serve_parser().parse_args(argv[1:])

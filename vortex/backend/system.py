@@ -23,8 +23,9 @@ def port_in_use(port: int) -> bool:
         except (psutil.Error, OSError):
             pass
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     try:
+        if os.name == "nt":
+            sock.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)
         sock.bind(("0.0.0.0", port))
     except OSError:
         return True

@@ -94,8 +94,15 @@ No hay script `make` ni `npm`; no inventes otros comandos de test/build.
 
 - `build/build_windows.bat` (ejecutar **en Windows**) → `dist\windows\Vortex.exe`.
 - `build/build_linux.sh` (Linux) → `dist/linux/`.
-- `flet pack` es la vía principal; `build/vortex.spec` es el fallback con PyInstaller.
-- Incluye siempre `vortex/static` como dato adicional.
+- `build/vortex.spec` (PyInstaller) es la vía principal en ambas plataformas; el hook de Flet
+  incluye el cliente de escritorio. No uses `flet pack` desde la raíz: borra el directorio
+  `build/` completo (scripts, iconos y spec).
+- Windows usa un entorno aparte `.venv-win` para no chocar con el `.venv` de Linux.
+- Incluye siempre `vortex/static` como dato adicional y resuelve rutas con
+  `vortex.resources.resource_path` para que funcionen dentro del ejecutable.
+- En ejecutables *windowed* `sys.stdout`/`sys.stderr` pueden ser `None`; llama a
+  `vortex.stdstreams.ensure_standard_streams()` antes de configurar uvicorn o usar `print`.
+  Sin esto, uvicorn falla con `Unable to configure formatter 'default'`.
 
 ## Git
 

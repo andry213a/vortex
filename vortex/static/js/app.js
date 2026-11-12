@@ -150,6 +150,7 @@
     $("login-error").textContent = message || "";
     $("login-secret").value = "";
     $("login-busy").classList.add("hidden");
+    $("login-guest").classList.toggle("hidden", !(state.allowGuest && !state.requiresLogin));
     setTimeout(function () {
       $("login-secret").focus();
     }, 50);
@@ -656,6 +657,56 @@
     });
   }
 
+  function createTextFile() {
+    var name = el("input", { class: "input", type: "text", value: "texto", maxlength: "240" });
+    var textarea = el("textarea", { class: "editor-area", placeholder: "Escribe aquí el texto que quieres guardar…", style: "min-height:240px;max-height:50vh;" });
+    var body = el(
+      "div",
+      {},
+      el("div", { class: "muted", style: "font-size:12px;margin-bottom:6px;", text: "Nombre del archivo" }),
+      name,
+      el("div", { class: "muted", style: "font-size:12px;margin:14px 0 6px;", text: "Contenido" }),
+      textarea
+    );
+    openModal({
+      title: "Escribir archivo de texto",
+      body: body,
+      actions: [
+        { label: "Cancelar", class: "ghost", onClick: closeModal },
+        { label: "Crear .txt", class: "primary", onClick: save }
+      ]
+    });
+    name.focus();
+
+    async function save() {
+      var cleanName = name.value.trim();
+      if (cleanName.toLowerCase().endsWith(".txt")) cleanName = cleanName.slice(0, -4);
+      if (!cleanName || cleanName === "." || cleanName === ".." || /[\/\\\0]/.test(cleanName)) {
+        toast("Escribe un nombre válido, sin rutas ni barras.", "error");
+        return;
+      }
+      var filename = cleanName + ".txt";
+      try {
+        var listing = await api("/api/files?path=" + encodeURIComponent(state.currentPath));
+        if ((listing.items || []).some(function (item) { return item.name.toLocaleLowerCase() === filename.toLocaleLowerCase(); })) {
+          toast("Ya existe «" + filename + "» en esta carpeta.", "error");
+          return;
+        }
+        var path = (state.currentPath ? state.currentPath + "/" : "") + filename;
+        await api("/api/files/write", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ path: path, content: textarea.value })
+        });
+        closeModal();
+        toast(filename + " creado", "success");
+        loadDir(state.currentPath, false);
+      } catch (err) {
+        toast(err.message, "error");
+      }
+    }
+  }
+
   async function doSearch(query) {
     if (!query) {
       loadDir(state.currentPath, false);
@@ -920,6 +971,10 @@
       }
     });
 
+    $("login-guest").addEventListener("click", function () {
+      hideLogin();
+      startApp();
+    });
     $("btn-login").addEventListener("click", function () {
       showLogin("");
     });
@@ -952,6 +1007,7 @@
       loadDir(state.currentPath, false);
     });
     $("btn-mkdir").addEventListener("click", createFolder);
+    $("btn-new-text").addEventListener("click", createTextFile);
     $("btn-upload").addEventListener("click", function () {
       $("file-input").click();
     });
