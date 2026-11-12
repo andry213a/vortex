@@ -128,6 +128,7 @@ class VortexUI:
         self.upload_speed_text = None
         self.upload_cancel_button: ft.IconButton | None = None
         self.upload_cancellable = False
+        self.upload_target_path = ""
         self.listing = None
         self.breadcrumb = None
         self.count_text = None
@@ -2295,6 +2296,8 @@ class VortexUI:
             threading.Thread(target=self._upload_worker, args=(selected,), daemon=True).start()
 
     def _upload_worker(self, paths: list[str]) -> None:
+        target_path = self.current_path
+        self.upload_target_path = target_path
         self.upload_cancel.clear()
         self.upload_cancellable = False
         self.upload_active = True
@@ -2307,7 +2310,7 @@ class VortexUI:
             self.upload_label = Path(path).name
             self.upload_speed = ""
             try:
-                self._upload_one(Path(path))
+                self._upload_one(Path(path), target_path)
             except Exception as exc:
                 self.upload_error = str(exc)
                 break
@@ -2328,11 +2331,10 @@ class VortexUI:
             self.upload_speed = "Completado"
             self.upload_done = True
 
-    def _upload_one(self, local: Path) -> None:
+    def _upload_one(self, local: Path, target_dir: str) -> None:
         if self.http is None:
             raise RuntimeError("Cliente HTTP no inicializado")
         size = local.stat().st_size
-        target_dir = self.current_path
         if size <= self.config.direct_upload_limit:
             self.upload_cancellable = False
             self.upload_speed = "Subiendo…"
@@ -2478,7 +2480,8 @@ class VortexUI:
             self.upload_widget.visible = False
             self.page.update()
             self._notify(f"Error de subida: {message}", True)
-            self.refresh_listing(self.current_path)
+            if self.current_path == self.upload_target_path:
+                self.refresh_listing(self.upload_target_path)
             return
         if self.upload_done:
             self.upload_done = False
@@ -2491,7 +2494,8 @@ class VortexUI:
             )
             self.upload_cancel.clear()
             self._notify(message)
-            self.refresh_listing(self.current_path)
+            if self.current_path == self.upload_target_path:
+                self.refresh_listing(self.upload_target_path)
 
     def open_palette(self) -> None:
         if self.palette_dialog is not None:
