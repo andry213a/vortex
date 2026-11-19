@@ -1706,6 +1706,19 @@ class VortexUI:
         buffer_qr = io.BytesIO()
         imagen_qr.save(buffer_qr)
         qr_base64 = base64.b64encode(buffer_qr.getvalue()).decode("ascii")
+        nota_firewall = (
+            ft.Text(
+                f"En Linux con UFW, permite TCP {puerto} desde tu red local. "
+                f"Abrir 8080 no abre otros puertos. "
+                f"Ejemplo: sudo ufw allow from <SUBRED_LOCAL> "
+                f"to any port {puerto} proto tcp",
+                color=MUTED,
+                size=12,
+                selectable=True,
+            )
+            if sys.platform.startswith("linux")
+            else ft.Container()
+        )
         dialogo = ft.AlertDialog(
             modal=True,
             title=ft.Row(
@@ -1763,6 +1776,7 @@ class VortexUI:
                             color=MUTED,
                             size=12,
                         ),
+                        nota_firewall,
                     ],
                     tight=True,
                     spacing=14,

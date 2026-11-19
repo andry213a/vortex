@@ -66,9 +66,14 @@ Opciones: `--auth auto|manual|none`, `--token`, `--password`, `--hostname`.
 
 ### Acceso desde otros dispositivos
 
-- Web: `http://vortex.local:8080` (requiere Bonjour en Windows o Avahi en Linux) o `http://IP-DEL-HOST:8080`.
+- Web: `http://vortex.local:<PUERTO>` (requiere Bonjour en Windows o Avahi en Linux) o
+  `http://IP-DEL-HOST:<PUERTO>`. El puerto predeterminado es `8080`; la app usa el puerto
+  elegido en su configuración.
 - Móvil: abre la misma URL en el navegador; la interfaz es responsive.
 - Escritorio: la app Flet actúa como host y cliente local.
+- En Linux, si UFW está activo, permite el puerto TCP elegido desde la subred local. Abrir `8080`
+  no habilita otros puertos. Sustituye `<SUBRED_LOCAL>` y `<PUERTO>` en:
+  `sudo ufw allow from <SUBRED_LOCAL> to any port <PUERTO> proto tcp`.
 - En Chromebook, si Vortex corre en el entorno Linux, habilita el reenvío TCP del puerto del servidor en
   **Configuración > Desarrolladores > Linux > Reenvío de puertos**. Desde otros dispositivos usa la IP
   Wi-Fi del Chromebook, no la IP interna del contenedor.
