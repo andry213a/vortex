@@ -1,3 +1,5 @@
+# Configuración persistente del servidor y generación de credenciales.
+
 from __future__ import annotations
 
 import json
@@ -26,26 +28,29 @@ LOGIN_BLOCK_SECONDS = 15 * 60
 TOKEN_TTL_SECONDS = 12 * 60 * 60
 
 
+# Directorios de configuración y datos gestionados por platformdirs.
 def app_config_dir() -> Path:
-    path = Path(user_config_dir(APP_NAME, APP_AUTHOR))
-    path.mkdir(parents=True, exist_ok=True)
-    return path
+    ruta = Path(user_config_dir(APP_NAME, APP_AUTHOR))
+    ruta.mkdir(parents=True, exist_ok=True)
+    return ruta
 
 
 def app_data_dir() -> Path:
-    path = Path(user_data_dir(APP_NAME, APP_AUTHOR))
-    path.mkdir(parents=True, exist_ok=True)
-    return path
+    ruta = Path(user_data_dir(APP_NAME, APP_AUTHOR))
+    ruta.mkdir(parents=True, exist_ok=True)
+    return ruta
 
 
+# Token automático legible y difícil de adivinar.
 def generate_auto_token() -> str:
-    alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
-    left = "".join(secrets.choice(alphabet) for _ in range(4))
-    right = "".join(secrets.choice(string.digits + alphabet) for _ in range(4))
-    return f"{left}-{right}"
+    alfabeto = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+    izquierda = "".join(secrets.choice(alfabeto) for _ in range(4))
+    derecha = "".join(secrets.choice(string.digits + alfabeto) for _ in range(4))
+    return f"{izquierda}-{derecha}"
 
 
 @dataclass
+# Modelo de configuración persistente y sus validaciones.
 class ServerConfig:
     base_dir: str = ""
     port: int = DEFAULT_PORT
@@ -73,8 +78,8 @@ class ServerConfig:
             raise ValueError("El puerto debe ser un entero entre 1 y 65535")
         if not self.base_dir:
             raise ValueError("Debe seleccionar una carpeta raíz para el servidor")
-        base = Path(self.base_dir).expanduser()
-        if not base.exists() or not base.is_dir():
+        raiz = Path(self.base_dir).expanduser()
+        if not raiz.exists() or not raiz.is_dir():
             raise ValueError("La carpeta raíz seleccionada no existe o no es un directorio")
         if not self.auto_token:
             self.auto_token = generate_auto_token()
@@ -91,20 +96,21 @@ class ServerConfig:
         return Path(self.base_dir).expanduser().resolve()
 
     def to_dict(self, persist: bool = True) -> dict[str, Any]:
-        data = asdict(self)
+        datos = asdict(self)
         if persist:
-            data.pop("manual_password", None)
-        data["config_version"] = CONFIG_VERSION
-        return data
+            datos.pop("manual_password", None)
+        datos["config_version"] = CONFIG_VERSION
+        return datos
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> ServerConfig:
-        known = {f for f in cls.__dataclass_fields__}
-        values = {k: v for k, v in data.items() if k in known}
-        values.pop("manual_password", None)
-        return cls(**values)
+        conocidos = {campo for campo in cls.__dataclass_fields__}
+        valores = {clave: valor for clave, valor in data.items() if clave in conocidos}
+        valores.pop("manual_password", None)
+        return cls(**valores)
 
 
+# Carga y guardado atómico del archivo config.json.
 class ConfigStore:
     def __init__(self, path: Path | None = None) -> None:
         self.path = path or (app_config_dir() / "config.json")
@@ -113,18 +119,18 @@ class ConfigStore:
         if not self.path.exists():
             return ServerConfig()
         try:
-            raw = json.loads(self.path.read_text(encoding="utf-8"))
+            crudo = json.loads(self.path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError):
             return ServerConfig()
-        if not isinstance(raw, dict):
+        if not isinstance(crudo, dict):
             return ServerConfig()
-        return ServerConfig.from_dict(raw)
+        return ServerConfig.from_dict(crudo)
 
     def save(self, config: ServerConfig) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        tmp = self.path.with_suffix(".json.tmp")
-        tmp.write_text(
+        temporal = self.path.with_suffix(".json.tmp")
+        temporal.write_text(
             json.dumps(config.to_dict(persist=True), indent=2, ensure_ascii=False),
             encoding="utf-8",
         )
-        tmp.replace(self.path)
+        temporal.replace(self.path)

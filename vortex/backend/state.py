@@ -1,3 +1,5 @@
+# Estado compartido del servidor en ejecución y cambios de archivos.
+
 from __future__ import annotations
 
 import threading
@@ -13,6 +15,7 @@ from .security import RateLimiter, relative_to, resolve_within
 from .transfer import UploadManager, unique_path
 
 
+# Estado compartido del servidor y sincronización de cambios en disco.
 class Runtime:
     def __init__(self, config: ServerConfig) -> None:
         self.config = config
@@ -34,40 +37,42 @@ class Runtime:
         self.uploads.cleanup_stale()
         self.mdns = MDNSAdvertiser(config.hostname, config.port)
 
+    # Clasifica un evento del sistema de archivos y actualiza la revisión.
     def _record_file_change(self, record: dict) -> None:
-        action = record.get("action")
-        if action not in {
+        accion = record.get("action")
+        if accion not in {
             "FILE_UPLOAD", "FILE_WRITE", "FILE_DELETE", "FILE_RENAME",
             "FILE_MKDIR", "FILE_VERSION_RESTORE",
         }:
             return
-        target = str(record.get("target_path") or "")
-        details = record.get("details") or {}
-        paths = {self._parent_path(target)}
-        change: dict = {"paths": sorted(paths), "action": action}
-        if action == "FILE_RENAME":
-            source = str(details.get("from") or "")
-            paths.add(self._parent_path(source))
-            change["paths"] = sorted(paths)
-            if details.get("is_dir"):
-                change["renamed"] = {"from": source, "to": target}
-        elif action == "FILE_DELETE" and details.get("is_dir"):
-            change["removed"] = target
+        objetivo = str(record.get("target_path") or "")
+        detalles = record.get("details") or {}
+        rutas = {self._parent_path(objetivo)}
+        cambio: dict = {"paths": sorted(rutas), "action": accion}
+        if accion == "FILE_RENAME":
+            origen = str(detalles.get("from") or "")
+            rutas.add(self._parent_path(origen))
+            cambio["paths"] = sorted(rutas)
+            if detalles.get("is_dir"):
+                cambio["renamed"] = {"from": origen, "to": objetivo}
+        elif accion == "FILE_DELETE" and detalles.get("is_dir"):
+            cambio["removed"] = objetivo
         with self._file_change_lock:
             self._file_change_revision += 1
-            change["revision"] = self._file_change_revision
-            self._file_changes.append(change)
+            cambio["revision"] = self._file_change_revision
+            self._file_changes.append(cambio)
 
     @staticmethod
     def _parent_path(path: str) -> str:
-        parent = PurePosixPath(path).parent.as_posix()
-        return "" if parent == "." else parent
+        padre = PurePosixPath(path).parent.as_posix()
+        return "" if padre == "." else padre
 
+    # Devuelve los cambios posteriores a una revisión para el sondeo web.
     def file_changes_since(self, revision: int) -> dict:
         with self._file_change_lock:
             return {
                 "revision": self._file_change_revision,
-                "changes": [item.copy() for item in self._file_changes if item["revision"] > revision],
+                "changes": [elemento.copy() for elemento in self._file_changes if elemento["revision"] > revision],
             }
 
     def resolve(self, relative: str) -> Path:

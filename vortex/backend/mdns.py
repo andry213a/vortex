@@ -1,3 +1,5 @@
+# Anuncio y descubrimiento del servidor mediante mDNS.
+
 from __future__ import annotations
 
 import socket
@@ -7,14 +9,14 @@ from zeroconf import ServiceInfo, Zeroconf
 
 
 def local_ip() -> str:
-    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    conexion_udp = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     try:
-        sock.connect(("8.8.8.8", 80))
-        return sock.getsockname()[0]
+        conexion_udp.connect(("8.8.8.8", 80))
+        return conexion_udp.getsockname()[0]
     except OSError:
         return "127.0.0.1"
     finally:
-        sock.close()
+        conexion_udp.close()
 
 
 class MDNSAdvertiser:
@@ -36,11 +38,11 @@ class MDNSAdvertiser:
             if self._zeroconf is not None:
                 return True
             try:
-                address = local_ip()
-                info = ServiceInfo(
+                direccion = local_ip()
+                informacion = ServiceInfo(
                     "_http._tcp.local.",
                     f"Vortex on {socket.gethostname()}._http._tcp.local.",
-                    addresses=[socket.inet_aton(address)],
+                    addresses=[socket.inet_aton(direccion)],
                     port=self.port,
                     properties={
                         "path": "/",
@@ -49,15 +51,15 @@ class MDNSAdvertiser:
                     },
                     server=self.hostname,
                 )
-                zeroconf = Zeroconf()
-                zeroconf.register_service(info)
-                self._zeroconf = zeroconf
-                self._info = info
-                self.address = address
+                servicio_mdns = Zeroconf()
+                servicio_mdns.register_service(informacion)
+                self._zeroconf = servicio_mdns
+                self._info = informacion
+                self.address = direccion
                 self.error = None
                 return True
-            except Exception as exc:
-                self.error = str(exc)
+            except Exception as excepcion:
+                self.error = str(excepcion)
                 self._zeroconf = None
                 self._info = None
                 return False

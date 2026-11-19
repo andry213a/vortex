@@ -1,9 +1,12 @@
+// Cliente web de Vortex: búsqueda, archivos, subidas y sesión.
 (function () {
   "use strict";
 
-  var DIRECT_LIMIT = 100 * 1024 * 1024;
+  // Límite a partir del cual una subida se divide en bloques.
+  var LIMITE_DIRECTO = 100 * 1024 * 1024;
 
-  var state = {
+  // Estado compartido de la sesión, la carpeta actual y las subidas.
+  var estadoGlobal = {
     token: localStorage.getItem("vortex_token") || null,
     role: null,
     authMode: "auto",
@@ -24,7 +27,8 @@
     fileSyncBusy: false
   };
 
-  var KIND_ICONS = {
+  // Iconos asociados a cada tipo de archivo reconocido.
+  var ICONOS_TIPO = {
     folder: "folder",
     video: "movie",
     audio: "audio",
@@ -46,114 +50,116 @@
     other: "file"
   };
 
+  // Utilidades para consultar y construir elementos del DOM.
   function $(id) {
     return document.getElementById(id);
   }
 
-  function el(tag, attrs) {
-    var node = document.createElement(tag);
-    attrs = attrs || {};
-    Object.keys(attrs).forEach(function (key) {
-      var value = attrs[key];
-      if (value === null || value === undefined) return;
-      if (key === "class") node.className = value;
-      else if (key === "text") node.textContent = value;
-      else if (key === "html") node.innerHTML = value;
-      else if (key === "dataset") Object.assign(node.dataset, value);
-      else if (key.indexOf("on") === 0) node.addEventListener(key.slice(2).toLowerCase(), value);
-      else if (key === "value") node.value = value;
-      else node.setAttribute(key, value);
+  function el(etiquetaHtml, atributos) {
+    var nodo = document.createElement(etiquetaHtml);
+    atributos = atributos || {};
+    Object.keys(atributos).forEach(function (clave) {
+      var valor = atributos[clave];
+      if (valor === null || valor === undefined) return;
+      if (clave === "class") nodo.className = valor;
+      else if (clave === "text") nodo.textContent = valor;
+      else if (clave === "html") nodo.innerHTML = valor;
+      else if (clave === "dataset") Object.assign(nodo.dataset, valor);
+      else if (clave.indexOf("on") === 0) nodo.addEventListener(clave.slice(2).toLowerCase(), valor);
+      else if (clave === "value") nodo.value = valor;
+      else nodo.setAttribute(clave, valor);
     });
     for (var i = 2; i < arguments.length; i++) {
-      var child = arguments[i];
-      if (child === null || child === undefined) continue;
-      node.append(child.nodeType ? child : document.createTextNode(String(child)));
+      var hijo = arguments[i];
+      if (hijo === null || hijo === undefined) continue;
+      nodo.append(hijo.nodeType ? hijo : document.createTextNode(String(hijo)));
     }
-    return node;
+    return nodo;
   }
 
-  function svgIcon(name, className) {
+  function svgIcon(nombre, claseCss) {
     return (
-      '<svg class="icon' + (className ? " " + className : "") + '" aria-hidden="true">' +
-      '<use href="#i-' + name + '"></use></svg>'
+      '<svg class="icon' + (claseCss ? " " + claseCss : "") + '" aria-hidden="true">' +
+      '<use href="#i-' + nombre + '"></use></svg>'
     );
   }
 
-  function setStatus(online) {
-    var pill = $("status-pill");
-    if (!pill) return;
-    pill.classList.toggle("offline", !online);
-    $("status-text").textContent = online ? "EN LÍNEA" : "DETENIDO";
+  function setStatus(conectado) {
+    var pastilla = $("status-pill");
+    if (!pastilla) return;
+    pastilla.classList.toggle("offline", !conectado);
+    $("status-text").textContent = conectado ? "EN LÍNEA" : "DETENIDO";
   }
 
-  function toast(message, type) {
-    type = type || "info";
-    var node = el("div", { class: "toast " + type, text: message });
-    $("toasts").append(node);
+  function toast(mensaje, tipoDato) {
+    tipoDato = tipoDato || "info";
+    var nodo = el("div", { class: "toast " + tipoDato, text: mensaje });
+    $("toasts").append(nodo);
     setTimeout(function () {
-      node.remove();
+      nodo.remove();
     }, 4200);
   }
 
   function authHeaders() {
-    return state.token ? { Authorization: "Bearer " + state.token } : {};
+    return estadoGlobal.token ? { Authorization: "Bearer " + estadoGlobal.token } : {};
   }
 
-  function detailOf(payload, fallback) {
-    if (!payload) return fallback;
-    var detail = payload.detail;
-    if (detail === undefined || detail === null) return fallback;
-    if (typeof detail === "object") return detail.message || JSON.stringify(detail);
-    return String(detail);
+  function detailOf(carga, respaldo) {
+    if (!carga) return respaldo;
+    var detalle = carga.detail;
+    if (detalle === undefined || detalle === null) return respaldo;
+    if (typeof detalle === "object") return detalle.message || JSON.stringify(detalle);
+    return String(detalle);
   }
 
-  async function api(path, options) {
-    options = options || {};
-    var headers = Object.assign({}, options.headers || {}, authHeaders());
-    var response;
+  // Acceso a la API, cabeceras de sesión y manejo común de errores.
+  async function api(ruta, opciones) {
+    opciones = opciones || {};
+    var cabeceras = Object.assign({}, opciones.headers || {}, authHeaders());
+    var respuesta;
     try {
-      response = await fetch(path, Object.assign({}, options, { headers: headers }));
-    } catch (err) {
+      respuesta = await fetch(ruta, Object.assign({}, opciones, { headers: cabeceras }));
+    } catch (errorCapturado) {
       setStatus(false);
       throw new Error("No se pudo conectar con el servidor");
     }
-    if (response.status === 401) {
+    if (respuesta.status === 401) {
       handleUnauthorized();
-      var unauthorized = new Error("No autenticado");
-      unauthorized.status = 401;
-      throw unauthorized;
+      var noAutorizado = new Error("No autenticado");
+      noAutorizado.status = 401;
+      throw noAutorizado;
     }
-    if (!response.ok) {
-      var message = response.statusText || "HTTP " + response.status;
+    if (!respuesta.ok) {
+      var mensaje = respuesta.statusText || "HTTP " + respuesta.status;
       try {
-        message = detailOf(await response.json(), message);
-      } catch (err) {}
-      var error = new Error(message);
-      error.status = response.status;
+        mensaje = detailOf(await respuesta.json(), mensaje);
+      } catch (errorCapturado) {}
+      var error = new Error(mensaje);
+      error.status = respuesta.status;
       throw error;
     }
     setStatus(true);
-    var contentType = response.headers.get("content-type") || "";
-    return contentType.indexOf("application/json") >= 0 ? response.json() : response.text();
+    var tipoContenido = respuesta.headers.get("content-type") || "";
+    return tipoContenido.indexOf("application/json") >= 0 ? respuesta.json() : respuesta.text();
   }
 
   function handleUnauthorized() {
-    if (state.token) {
-      state.token = null;
+    if (estadoGlobal.token) {
+      estadoGlobal.token = null;
       localStorage.removeItem("vortex_token");
     }
-    if (state.authMode !== "none") {
-      state.pending = location.pathname + location.search;
+    if (estadoGlobal.authMode !== "none") {
+      estadoGlobal.pending = location.pathname + location.search;
       showLogin("La sesión expiró o no es válida.");
     }
   }
 
-  function showLogin(message) {
+  function showLogin(mensaje) {
     $("login-overlay").classList.remove("hidden");
-    $("login-error").textContent = message || "";
+    $("login-error").textContent = mensaje || "";
     $("login-secret").value = "";
     $("login-busy").classList.add("hidden");
-    $("login-guest").classList.toggle("hidden", !(state.allowGuest && !state.requiresLogin));
+    $("login-guest").classList.toggle("hidden", !(estadoGlobal.allowGuest && !estadoGlobal.requiresLogin));
     setTimeout(function () {
       $("login-secret").focus();
     }, 50);
@@ -165,125 +171,126 @@
     $("login-busy").classList.add("hidden");
   }
 
-  function segmentPath(path) {
-    return path.split("/").map(encodeURIComponent).join("/");
+  function segmentPath(ruta) {
+    return ruta.split("/").map(encodeURIComponent).join("/");
   }
 
-  function browseUrl(path) {
-    return path ? "/browse/" + segmentPath(path) : "/";
+  function browseUrl(ruta) {
+    return ruta ? "/browse/" + segmentPath(ruta) : "/";
   }
 
-  function downloadUrl(path) {
-    return "/descargar/" + segmentPath(path);
+  function downloadUrl(ruta) {
+    return "/descargar/" + segmentPath(ruta);
   }
 
-  function fileUrl(path, inline) {
-    var params = new URLSearchParams({ path: path });
-    if (inline) params.set("inline", "1");
-    if (state.token) params.set("token", state.token);
-    return "/api/files/download?" + params.toString();
+  function fileUrl(ruta, enLinea) {
+    var parametros = new URLSearchParams({ path: ruta });
+    if (enLinea) parametros.set("inline", "1");
+    if (estadoGlobal.token) parametros.set("token", estadoGlobal.token);
+    return "/api/files/download?" + parametros.toString();
   }
 
-  function zipUrl(path) {
-    var params = new URLSearchParams({ path: path });
-    if (state.token) params.set("token", state.token);
-    return "/api/files/zip?" + params.toString();
+  function zipUrl(ruta) {
+    var parametros = new URLSearchParams({ path: ruta });
+    if (estadoGlobal.token) parametros.set("token", estadoGlobal.token);
+    return "/api/files/zip?" + parametros.toString();
   }
 
-  function humanSize(size) {
-    size = Number(size) || 0;
-    if (size <= 0) return "0 B";
-    var units = ["B", "KB", "MB", "GB", "TB"];
-    var value = size;
-    var index = 0;
-    while (value >= 1024 && index < units.length - 1) {
-      value /= 1024;
-      index += 1;
+  function humanSize(tamano) {
+    tamano = Number(tamano) || 0;
+    if (tamano <= 0) return "0 B";
+    var unidades = ["B", "KB", "MB", "GB", "TB"];
+    var valor = tamano;
+    var indice = 0;
+    while (valor >= 1024 && indice < unidades.length - 1) {
+      valor /= 1024;
+      indice += 1;
     }
-    return index === 0 ? Math.round(value) + " " + units[index] : value.toFixed(1) + " " + units[index];
+    return indice === 0 ? Math.round(valor) + " " + unidades[indice] : valor.toFixed(1) + " " + unidades[indice];
   }
 
-  function humanSpeed(value) {
-    if (!value || value <= 0) return "";
-    return humanSize(value) + "/s";
+  function humanSpeed(valor) {
+    if (!valor || valor <= 0) return "";
+    return humanSize(valor) + "/s";
   }
 
-  function formatTime(timestamp) {
+  function formatTime(marcaTiempo) {
     try {
-      var date = new Date(timestamp * 1000);
-      var pad = function (value) {
-        return String(value).padStart(2, "0");
+      var fecha = new Date(marcaTiempo * 1000);
+      var relleno = function (valor) {
+        return String(valor).padStart(2, "0");
       };
       return (
-        pad(date.getDate()) + "/" + pad(date.getMonth() + 1) + "/" + date.getFullYear() +
-        " " + pad(date.getHours()) + ":" + pad(date.getMinutes())
+        relleno(fecha.getDate()) + "/" + relleno(fecha.getMonth() + 1) + "/" + fecha.getFullYear() +
+        " " + relleno(fecha.getHours()) + ":" + relleno(fecha.getMinutes())
       );
-    } catch (err) {
+    } catch (errorCapturado) {
       return "-";
     }
   }
 
+  // Arranque: comprobación de sesión, rol y sondeo de cambios en disco.
   function setRoleBadge() {
-    var badge = $("role-badge");
-    var labels = {
+    var insignia = $("role-badge");
+    var etiquetas = {
       host: "HOST",
       guest_write: "INVITADO · TOTAL",
       guest_read: "INVITADO · LECTURA"
     };
-    $("role-label").textContent = labels[state.role] || "INVITADO";
-    badge.className = "role-badge" + (state.role === "host" ? " host" : "");
-    $("btn-logs").classList.toggle("hidden", state.role !== "host");
-    $("btn-logout").classList.toggle("hidden", !state.token);
-    $("btn-login").classList.toggle("hidden", state.authMode === "none" || !!state.token);
+    $("role-label").textContent = etiquetas[estadoGlobal.role] || "INVITADO";
+    insignia.className = "role-badge" + (estadoGlobal.role === "host" ? " host" : "");
+    $("btn-logs").classList.toggle("hidden", estadoGlobal.role !== "host");
+    $("btn-logout").classList.toggle("hidden", !estadoGlobal.token);
+    $("btn-login").classList.toggle("hidden", estadoGlobal.authMode === "none" || !!estadoGlobal.token);
   }
 
   async function resolveRole() {
     try {
-      var me = await api("/api/auth/me");
-      state.role = me.role;
-      state.authMode = me.auth_mode;
-    } catch (err) {
-      if (err.status !== 401) throw err;
+      var yo = await api("/api/auth/me");
+      estadoGlobal.role = yo.role;
+      estadoGlobal.authMode = yo.auth_mode;
+    } catch (errorCapturado) {
+      if (errorCapturado.status !== 401) throw errorCapturado;
     }
   }
 
   async function boot() {
-    var status;
+    var estado;
     try {
-      status = await fetch("/api/auth/status").then(function (response) {
-        return response.json();
+      estado = await fetch("/api/auth/status").then(function (respuesta) {
+        return respuesta.json();
       });
-    } catch (err) {
+    } catch (errorCapturado) {
       setStatus(false);
       toast("No se pudo contactar con el servidor", "error");
       return;
     }
     setStatus(true);
-    state.authMode = status.auth_mode;
-    state.requiresLogin = status.requires_login;
-    state.allowGuest = status.allow_guest;
-    if (state.token) {
+    estadoGlobal.authMode = estado.auth_mode;
+    estadoGlobal.requiresLogin = estado.requires_login;
+    estadoGlobal.allowGuest = estado.allow_guest;
+    if (estadoGlobal.token) {
       try {
-        var me = await api("/api/auth/me");
-        state.role = me.role;
-      } catch (err) {
-        if (err.status === 401) {
-          state.token = null;
+        var yo = await api("/api/auth/me");
+        estadoGlobal.role = yo.role;
+      } catch (errorCapturado) {
+        if (errorCapturado.status === 401) {
+          estadoGlobal.token = null;
           localStorage.removeItem("vortex_token");
         }
       }
     }
-    if (!state.token) {
-      if (state.requiresLogin) {
-        state.pending = location.pathname + location.search;
+    if (!estadoGlobal.token) {
+      if (estadoGlobal.requiresLogin) {
+        estadoGlobal.pending = location.pathname + location.search;
         showLogin("");
         return;
       }
       try {
-        var guest = await api("/api/auth/me");
-        state.role = guest.role;
-        state.authMode = guest.auth_mode;
-      } catch (err) {
+        var invitado = await api("/api/auth/me");
+        estadoGlobal.role = invitado.role;
+        estadoGlobal.authMode = invitado.auth_mode;
+      } catch (errorCapturado) {
         showLogin("");
         return;
       }
@@ -297,8 +304,8 @@
     setStatus(true);
     try {
       await resolveRole();
-    } catch (err) {
-      toast(err.message, "error");
+    } catch (errorCapturado) {
+      toast(errorCapturado.message, "error");
     }
     setRoleBadge();
     await routeFromLocation();
@@ -306,113 +313,114 @@
   }
 
   function startFileSync() {
-    if (state.fileSyncTimer) clearInterval(state.fileSyncTimer);
-    state.fileSyncBusy = false;
+    if (estadoGlobal.fileSyncTimer) clearInterval(estadoGlobal.fileSyncTimer);
+    estadoGlobal.fileSyncBusy = false;
     pollFileChanges();
-    state.fileSyncTimer = setInterval(pollFileChanges, 1000);
+    estadoGlobal.fileSyncTimer = setInterval(pollFileChanges, 1000);
   }
 
   async function pollFileChanges() {
-    if (state.fileSyncBusy || document.hidden) return;
-    state.fileSyncBusy = true;
+    if (estadoGlobal.fileSyncBusy || document.hidden) return;
+    estadoGlobal.fileSyncBusy = true;
     try {
-      var data = await api("/api/system/changes?since=" + state.fileRevision);
-      var changes = data.changes || [];
-      state.fileRevision = Number(data.revision) || 0;
-      if (!changes.length) return;
+      var datos = await api("/api/system/changes?since=" + estadoGlobal.fileRevision);
+      var cambios = datos.changes || [];
+      estadoGlobal.fileRevision = Number(datos.revision) || 0;
+      if (!cambios.length) return;
 
-      var path = state.currentPath;
-      var refresh = false;
-      changes.forEach(function (change) {
-        if (change.removed && (path === change.removed || path.indexOf(change.removed + "/") === 0)) {
-          path = change.removed.indexOf("/") >= 0 ? change.removed.slice(0, change.removed.lastIndexOf("/")) : "";
-          refresh = true;
+      var ruta = estadoGlobal.currentPath;
+      var refrescar = false;
+      cambios.forEach(function (cambio) {
+        if (cambio.removed && (ruta === cambio.removed || ruta.indexOf(cambio.removed + "/") === 0)) {
+          ruta = cambio.removed.indexOf("/") >= 0 ? cambio.removed.slice(0, cambio.removed.lastIndexOf("/")) : "";
+          refrescar = true;
         }
-        if (change.renamed && (path === change.renamed.from || path.indexOf(change.renamed.from + "/") === 0)) {
-          path = change.renamed.to + path.slice(change.renamed.from.length);
-          refresh = true;
+        if (cambio.renamed && (ruta === cambio.renamed.from || ruta.indexOf(cambio.renamed.from + "/") === 0)) {
+          ruta = cambio.renamed.to + ruta.slice(cambio.renamed.from.length);
+          refrescar = true;
         }
-        if ((change.paths || []).indexOf(path) >= 0) refresh = true;
+        if ((cambio.paths || []).indexOf(ruta) >= 0) refrescar = true;
       });
-      if (refresh) {
+      if (refrescar) {
         try {
-          history.replaceState({ path: path }, "", browseUrl(path));
-        } catch (err) {}
-        await loadDir(path, false);
+          history.replaceState({ path: ruta }, "", browseUrl(ruta));
+        } catch (errorCapturado) {}
+        await loadDir(ruta, false);
       }
-    } catch (err) {
-      if (err.status !== 401 && err.status !== 404) setStatus(false);
+    } catch (errorCapturado) {
+      if (errorCapturado.status !== 401 && errorCapturado.status !== 404) setStatus(false);
     } finally {
-      state.fileSyncBusy = false;
+      estadoGlobal.fileSyncBusy = false;
     }
   }
 
+  // Navegación, listado y pintado de la carpeta actual.
   async function routeFromLocation() {
-    var pathname = location.pathname;
+    var rutaUrl = location.pathname;
     try {
-      pathname = decodeURIComponent(pathname);
-    } catch (err) {}
-    if (pathname.indexOf("/descargar/") === 0) {
-      var target = pathname.slice("/descargar/".length);
-      triggerDownload(target);
-      var parent = target.indexOf("/") >= 0 ? target.slice(0, target.lastIndexOf("/")) : "";
-      state.pending = "";
-      await loadDir(parent, true);
-    } else if (pathname.indexOf("/browse/") === 0) {
-      await loadDir(pathname.slice("/browse/".length), false);
+      rutaUrl = decodeURIComponent(rutaUrl);
+    } catch (errorCapturado) {}
+    if (rutaUrl.indexOf("/descargar/") === 0) {
+      var objetivo = rutaUrl.slice("/descargar/".length);
+      triggerDownload(objetivo);
+      var padre = objetivo.indexOf("/") >= 0 ? objetivo.slice(0, objetivo.lastIndexOf("/")) : "";
+      estadoGlobal.pending = "";
+      await loadDir(padre, true);
+    } else if (rutaUrl.indexOf("/browse/") === 0) {
+      await loadDir(rutaUrl.slice("/browse/".length), false);
     } else {
-      await loadDir(state.currentPath || "", false);
+      await loadDir(estadoGlobal.currentPath || "", false);
     }
   }
 
-  async function loadDir(path, updateHistory) {
+  async function loadDir(ruta, updateHistory) {
     updateHistory = updateHistory !== false;
     try {
-      var data = await api("/api/files?path=" + encodeURIComponent(path));
-      state.currentPath = data.path;
-      state.parent = data.parent;
-      state.items = data.items;
+      var datos = await api("/api/files?path=" + encodeURIComponent(ruta));
+      estadoGlobal.currentPath = datos.path;
+      estadoGlobal.parent = datos.parent;
+      estadoGlobal.items = datos.items;
       $("search").value = "";
       renderBreadcrumb();
-      renderItems(data.items);
-      $("count").textContent = data.total + " elementos";
+      renderItems(datos.items);
+      $("count").textContent = datos.total + " elementos";
       if (updateHistory) {
         try {
-          history.pushState({ path: data.path }, "", browseUrl(data.path));
-        } catch (err) {}
+          history.pushState({ path: datos.path }, "", browseUrl(datos.path));
+        } catch (errorCapturado) {}
       }
-    } catch (err) {
-      if (err.status !== 401) toast(err.message, "error");
+    } catch (errorCapturado) {
+      if (errorCapturado.status !== 401) toast(errorCapturado.message, "error");
     }
   }
 
   function renderBreadcrumb() {
-    var nav = $("breadcrumb");
-    nav.innerHTML = "";
-    var root = el("button", { class: "crumb root", html: svgIcon("home") + "<span>Raíz</span>" });
-    root.addEventListener("click", function () {
+    var navegacion = $("breadcrumb");
+    navegacion.innerHTML = "";
+    var raiz = el("button", { class: "crumb root", html: svgIcon("home") + "<span>Raíz</span>" });
+    raiz.addEventListener("click", function () {
       loadDir("");
     });
-    nav.append(root);
-    if (!state.currentPath) return;
-    var accumulated = [];
-    state.currentPath.split("/").forEach(function (part) {
-      accumulated.push(part);
-      var target = accumulated.join("/");
-      nav.append(el("span", { class: "crumb-sep", text: "/" }));
-      var crumb = el("button", { class: "crumb", text: part });
-      crumb.addEventListener("click", function () {
-        loadDir(target);
+    navegacion.append(raiz);
+    if (!estadoGlobal.currentPath) return;
+    var acumulado = [];
+    estadoGlobal.currentPath.split("/").forEach(function (parte) {
+      acumulado.push(parte);
+      var objetivo = acumulado.join("/");
+      navegacion.append(el("span", { class: "crumb-sep", text: "/" }));
+      var migaja = el("button", { class: "crumb", text: parte });
+      migaja.addEventListener("click", function () {
+        loadDir(objetivo);
       });
-      nav.append(crumb);
+      navegacion.append(migaja);
     });
   }
 
-  function renderItems(items) {
-    var listing = $("listing");
-    listing.innerHTML = "";
-    if (!items.length) {
-      listing.append(
+  function renderItems(elementos) {
+    var listado = $("listing");
+    listado.innerHTML = "";
+    if (!elementos.length) {
+      listado.append(
         el(
           "div",
           { class: "empty" },
@@ -423,113 +431,114 @@
       );
       return;
     }
-    items.forEach(function (item) {
-      listing.append(buildRow(item));
+    elementos.forEach(function (elemento) {
+      listado.append(buildRow(elemento));
     });
   }
 
-  function buildRow(item) {
-    var kind = item.kind || "other";
-    var row = el("div", { class: "row" });
-    row.addEventListener("click", function () {
-      openItem(item);
+  function buildRow(elemento) {
+    var tipo = elemento.kind || "other";
+    var fila = el("div", { class: "row" });
+    fila.addEventListener("click", function () {
+      openItem(elemento);
     });
-    var icon = el("div", {
-      class: "row-icon kind-" + kind,
-      html: svgIcon(KIND_ICONS[kind] || KIND_ICONS.other)
+    var icono = el("div", {
+      class: "row-icon kind-" + tipo,
+      html: svgIcon(ICONOS_TIPO[tipo] || ICONOS_TIPO.other)
     });
-    var meta = item.is_dir ? "Carpeta" : humanSize(item.size);
-    meta += "  ·  " + formatTime(item.modified);
-    var main = el(
+    var metadatos = elemento.is_dir ? "Carpeta" : humanSize(elemento.size);
+    metadatos += "  ·  " + formatTime(elemento.modified);
+    var principal = el(
       "div",
       { class: "row-main" },
-      el("div", { class: "row-name", text: item.name }),
-      el("div", { class: "row-meta", text: meta })
+      el("div", { class: "row-name", text: elemento.name }),
+      el("div", { class: "row-meta", text: metadatos })
     );
-    var actions = el("div", { class: "row-actions" });
-    if (item.is_dir) {
-      actions.append(actionButton("archive", "Descargar .zip", function () {
-        triggerDownloadZip(item.path);
+    var acciones = el("div", { class: "row-actions" });
+    if (elemento.is_dir) {
+      acciones.append(actionButton("archive", "Descargar .zip", function () {
+        triggerDownloadZip(elemento.path);
       }));
     } else {
-      actions.append(actionButton("download", "Descargar", function () {
-        triggerDownload(item.path);
+      acciones.append(actionButton("download", "Descargar", function () {
+        triggerDownload(elemento.path);
       }));
     }
-    if (item.editable && !item.is_dir) {
-      actions.append(actionButton("edit", "Editar", function () {
-        openEditor(item);
+    if (elemento.editable && !elemento.is_dir) {
+      acciones.append(actionButton("edit", "Editar", function () {
+        openEditor(elemento);
       }, "accent"));
     }
-    actions.append(actionButton("rename", "Renombrar", function () {
-      openRename(item);
+    acciones.append(actionButton("rename", "Renombrar", function () {
+      openRename(elemento);
     }));
-    actions.append(actionButton("delete", "Eliminar", function () {
-      confirmDelete(item);
+    acciones.append(actionButton("delete", "Eliminar", function () {
+      confirmDelete(elemento);
     }, "danger"));
-    row.append(icon, main, actions);
-    return row;
+    fila.append(icono, principal, acciones);
+    return fila;
   }
 
-  function actionButton(iconName, title, handler, className) {
-    var button = el("button", {
-      class: "icon-btn" + (className ? " " + className : ""),
-      title: title,
-      "aria-label": title,
-      html: svgIcon(iconName)
+  function actionButton(nombreIcono, titulo, manejador, claseCss) {
+    var boton = el("button", {
+      class: "icon-btn" + (claseCss ? " " + claseCss : ""),
+      title: titulo,
+      "aria-label": titulo,
+      html: svgIcon(nombreIcono)
     });
-    button.addEventListener("click", function (event) {
-      event.stopPropagation();
-      handler();
+    boton.addEventListener("click", function (evento) {
+      evento.stopPropagation();
+      manejador();
     });
-    return button;
+    return boton;
   }
 
-  function openItem(item) {
-    if (item.is_dir) loadDir(item.path);
-    else openPreview(item);
+  function openItem(elemento) {
+    if (elemento.is_dir) loadDir(elemento.path);
+    else openPreview(elemento);
   }
 
-  function triggerDownload(path) {
-    var link = el("a", { href: fileUrl(path) });
-    document.body.append(link);
-    link.click();
-    link.remove();
+  function triggerDownload(ruta) {
+    var enlace = el("a", { href: fileUrl(ruta) });
+    document.body.append(enlace);
+    enlace.click();
+    enlace.remove();
   }
 
-  function triggerDownloadZip(path) {
-    var link = el("a", { href: zipUrl(path) });
-    document.body.append(link);
-    link.click();
-    link.remove();
+  function triggerDownloadZip(ruta) {
+    var enlace = el("a", { href: zipUrl(ruta) });
+    document.body.append(enlace);
+    enlace.click();
+    enlace.remove();
   }
 
-  function openModal(options) {
-    var backdrop = $("modal-backdrop");
-    var modal = $("modal");
-    modal.className = "modal" + (options.narrow ? " narrow" : "");
-    modal.innerHTML = "";
-    modal.append(el("div", { class: "modal-head" }, el("span", { text: options.title })));
-    var body = el("div", { class: "modal-body" });
-    if (typeof options.body === "string") body.innerHTML = options.body;
-    else if (options.body) body.append(options.body);
-    modal.append(body);
-    if (options.actions && options.actions.length) {
-      var foot = el("div", { class: "modal-foot" });
-      options.actions.forEach(function (action) {
-        var button = el("button", { class: "btn " + (action.class || "") });
-        if (action.icon) button.innerHTML = svgIcon(action.icon);
-        button.append(document.createTextNode(action.label));
-        button.addEventListener("click", function () {
-          if (action.onClick) action.onClick();
+  // Modales, vista previa y edición de archivos de texto.
+  function openModal(opciones) {
+    var fondoModal = $("modal-backdrop");
+    var ventanaModal = $("modal");
+    ventanaModal.className = "modal" + (opciones.narrow ? " narrow" : "");
+    ventanaModal.innerHTML = "";
+    ventanaModal.append(el("div", { class: "modal-head" }, el("span", { text: opciones.title })));
+    var cuerpo = el("div", { class: "modal-body" });
+    if (typeof opciones.body === "string") cuerpo.innerHTML = opciones.body;
+    else if (opciones.body) cuerpo.append(opciones.body);
+    ventanaModal.append(cuerpo);
+    if (opciones.actions && opciones.actions.length) {
+      var pie = el("div", { class: "modal-foot" });
+      opciones.actions.forEach(function (accion) {
+        var boton = el("button", { class: "btn " + (accion.class || "") });
+        if (accion.icon) boton.innerHTML = svgIcon(accion.icon);
+        boton.append(document.createTextNode(accion.label));
+        boton.addEventListener("click", function () {
+          if (accion.onClick) accion.onClick();
           else closeModal();
         });
-        foot.append(button);
+        pie.append(boton);
       });
-      modal.append(foot);
+      ventanaModal.append(pie);
     }
-    backdrop.classList.remove("hidden");
-    return { modal: modal, body: body };
+    fondoModal.classList.remove("hidden");
+    return { modal: ventanaModal, body: cuerpo };
   }
 
   function closeModal() {
@@ -537,149 +546,150 @@
     $("modal").innerHTML = "";
   }
 
-  function openPreview(item) {
-    var body = el("div");
-    var actions = [
+  function openPreview(elemento) {
+    var cuerpo = el("div");
+    var acciones = [
       { label: "Cerrar", class: "ghost", onClick: closeModal },
       { label: "Descargar", class: "primary", icon: "download", onClick: function () {
-        triggerDownload(item.path);
+        triggerDownload(elemento.path);
       } }
     ];
-    if (item.editable && !item.is_dir) {
-      actions.splice(1, 0, { label: "Editar", class: "", icon: "edit", onClick: function () {
+    if (elemento.editable && !elemento.is_dir) {
+      acciones.splice(1, 0, { label: "Editar", class: "", icon: "edit", onClick: function () {
         closeModal();
-        openEditor(item);
+        openEditor(elemento);
       } });
     }
-    if (item.kind === "image") {
-      body.append(el("img", { src: fileUrl(item.path, true), alt: item.name }));
-    } else if (item.kind === "video") {
-      body.append(el("video", { src: fileUrl(item.path, true), controls: "controls" }));
-    } else if (item.kind === "audio") {
-      body.append(el("audio", { src: fileUrl(item.path, true), controls: "controls" }));
-    } else if (item.kind === "pdf") {
-      body.append(el("iframe", { src: fileUrl(item.path, true), style: "width:100%;height:62vh;border:0;border-radius:8px;" }));
-    } else if (item.kind === "text" || item.kind === "code" || item.editable) {
-      body.append(el("div", { class: "muted", text: "Cargando vista previa…" }));
-      api("/api/files/read?path=" + encodeURIComponent(item.path))
-        .then(function (data) {
-          body.innerHTML = "";
-          body.append(el("pre", { text: data.content }));
+    if (elemento.kind === "image") {
+      cuerpo.append(el("img", { src: fileUrl(elemento.path, true), alt: elemento.name }));
+    } else if (elemento.kind === "video") {
+      cuerpo.append(el("video", { src: fileUrl(elemento.path, true), controls: "controls" }));
+    } else if (elemento.kind === "audio") {
+      cuerpo.append(el("audio", { src: fileUrl(elemento.path, true), controls: "controls" }));
+    } else if (elemento.kind === "pdf") {
+      cuerpo.append(el("iframe", { src: fileUrl(elemento.path, true), style: "width:100%;height:62vh;border:0;border-radius:8px;" }));
+    } else if (elemento.kind === "text" || elemento.kind === "code" || elemento.editable) {
+      cuerpo.append(el("div", { class: "muted", text: "Cargando vista previa…" }));
+      api("/api/files/read?path=" + encodeURIComponent(elemento.path))
+        .then(function (datos) {
+          cuerpo.innerHTML = "";
+          cuerpo.append(el("pre", { text: datos.content }));
         })
-        .catch(function (err) {
-          body.innerHTML = "";
-          body.append(el("div", { class: "muted", text: err.message }));
+        .catch(function (errorCapturado) {
+          cuerpo.innerHTML = "";
+          cuerpo.append(el("div", { class: "muted", text: errorCapturado.message }));
         });
     } else {
-      body.append(
+      cuerpo.append(
         el("div", { class: "empty" },
-          el("div", { class: "big kind-" + item.kind, html: svgIcon(KIND_ICONS[item.kind] || KIND_ICONS.other) }),
+          el("div", { class: "big kind-" + elemento.kind, html: svgIcon(ICONOS_TIPO[elemento.kind] || ICONOS_TIPO.other) }),
           el("div", { class: "muted", text: "Vista previa no disponible para este formato." })
         )
       );
     }
-    openModal({ title: item.name, body: body, actions: actions });
+    openModal({ title: elemento.name, body: cuerpo, actions: acciones });
   }
 
-  async function openEditor(item) {
-    var data;
+  async function openEditor(elemento) {
+    var datos;
     try {
-      data = await api("/api/files/read?path=" + encodeURIComponent(item.path));
-    } catch (err) {
-      toast(err.message, "error");
+      datos = await api("/api/files/read?path=" + encodeURIComponent(elemento.path));
+    } catch (errorCapturado) {
+      toast(errorCapturado.message, "error");
       return;
     }
-    var textarea = el("textarea", { class: "editor-area" });
-    textarea.value = data.content;
-    var footer = el("div", { class: "modal-foot" });
-    var cancel = el("button", { class: "btn ghost", text: "Cancelar" });
-    cancel.addEventListener("click", closeModal);
-    var save = el("button", { class: "btn success", html: svgIcon("save") + "Guardar" });
-    save.addEventListener("click", async function () {
+    var areaTexto = el("textarea", { class: "editor-area" });
+    areaTexto.value = datos.content;
+    var piePagina = el("div", { class: "modal-foot" });
+    var cancelar = el("button", { class: "btn ghost", text: "Cancelar" });
+    cancelar.addEventListener("click", closeModal);
+    var guardar = el("button", { class: "btn success", html: svgIcon("save") + "Guardar" });
+    guardar.addEventListener("click", async function () {
       try {
         await api("/api/files/write", {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ path: item.path, content: textarea.value })
+          body: JSON.stringify({ path: elemento.path, content: areaTexto.value })
         });
         closeModal();
         toast("Archivo guardado", "success");
-        loadDir(state.currentPath, false);
-      } catch (err) {
-        toast(err.message, "error");
+        loadDir(estadoGlobal.currentPath, false);
+      } catch (errorCapturado) {
+        toast(errorCapturado.message, "error");
       }
     });
-    footer.append(cancel, save);
-    var modal = $("modal");
-    modal.className = "modal";
-    modal.innerHTML = "";
-    modal.append(
-      el("div", { class: "modal-head" }, el("span", { text: "Editar · " + item.name })),
-      el("div", { class: "modal-body" }, textarea),
-      footer
+    piePagina.append(cancelar, guardar);
+    var ventanaModal = $("modal");
+    ventanaModal.className = "modal";
+    ventanaModal.innerHTML = "";
+    ventanaModal.append(
+      el("div", { class: "modal-head" }, el("span", { text: "Editar · " + elemento.name })),
+      el("div", { class: "modal-body" }, areaTexto),
+      piePagina
     );
     $("modal-backdrop").classList.remove("hidden");
   }
 
-  function promptDialog(title, label, initial, onAccept) {
-    var input = el("input", { class: "input", type: "text" });
-    input.value = initial || "";
-    var field = el("div", {}, el("div", { class: "muted", style: "font-size:12px;margin-bottom:6px;", text: label }), input);
+  // Diálogos de creación, renombrado y confirmación de borrado.
+  function promptDialog(titulo, etiqueta, valorInicial, alAceptar) {
+    var entrada = el("input", { class: "input", type: "text" });
+    entrada.value = valorInicial || "";
+    var campo = el("div", {}, el("div", { class: "muted", style: "font-size:12px;margin-bottom:6px;", text: etiqueta }), entrada);
     openModal({
-      title: title,
+      title: titulo,
       narrow: true,
-      body: field,
+      body: campo,
       actions: [
         { label: "Cancelar", class: "ghost", onClick: closeModal },
         { label: "Aceptar", class: "primary", onClick: function () {
-          var value = input.value.trim();
-          if (!value) return;
-          onAccept(value);
+          var valor = entrada.value.trim();
+          if (!valor) return;
+          alAceptar(valor);
         } }
       ]
     });
-    input.addEventListener("keydown", function (event) {
-      if (event.key === "Enter") {
-        event.preventDefault();
-        var value = input.value.trim();
-        if (value) onAccept(value);
+    entrada.addEventListener("keydown", function (evento) {
+      if (evento.key === "Enter") {
+        evento.preventDefault();
+        var valor = entrada.value.trim();
+        if (valor) alAceptar(valor);
       }
     });
-    setTimeout(function () { input.focus(); input.select(); }, 50);
+    setTimeout(function () { entrada.focus(); entrada.select(); }, 50);
   }
 
-  async function openRename(item) {
-    promptDialog("Renombrar", "Nuevo nombre para «" + item.name + "»", item.name, async function (newName) {
+  async function openRename(elemento) {
+    promptDialog("Renombrar", "Nuevo nombre para «" + elemento.name + "»", elemento.name, async function (nombreNuevo) {
       try {
         await api("/api/files/rename", {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ path: item.path, new_name: newName })
+          body: JSON.stringify({ path: elemento.path, new_name: nombreNuevo })
         });
         closeModal();
         toast("Elemento renombrado", "success");
-        loadDir(state.currentPath, false);
-      } catch (err) {
-        toast(err.message, "error");
+        loadDir(estadoGlobal.currentPath, false);
+      } catch (errorCapturado) {
+        toast(errorCapturado.message, "error");
       }
     });
   }
 
-  function confirmDelete(item) {
+  function confirmDelete(elemento) {
     openModal({
       title: "Eliminar",
       narrow: true,
-      body: el("div", { class: "muted", text: "¿Eliminar «" + item.name + "» de forma permanente?" }),
+      body: el("div", { class: "muted", text: "¿Eliminar «" + elemento.name + "» de forma permanente?" }),
       actions: [
         { label: "Cancelar", class: "ghost", onClick: closeModal },
         { label: "Eliminar", class: "danger", onClick: async function () {
           try {
-            await api("/api/files?path=" + encodeURIComponent(item.path), { method: "DELETE" });
+            await api("/api/files?path=" + encodeURIComponent(elemento.path), { method: "DELETE" });
             closeModal();
             toast("Elemento eliminado", "success");
-            loadDir(state.currentPath, false);
-          } catch (err) {
-            toast(err.message, "error");
+            loadDir(estadoGlobal.currentPath, false);
+          } catch (errorCapturado) {
+            toast(errorCapturado.message, "error");
           }
         } }
       ]
@@ -687,94 +697,95 @@
   }
 
   function createFolder() {
-    promptDialog("Nueva carpeta", "Nombre de la carpeta", "", async function (name) {
+    promptDialog("Nueva carpeta", "Nombre de la carpeta", "", async function (nombre) {
       try {
         await api("/api/files/mkdir", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ path: state.currentPath, name: name })
+          body: JSON.stringify({ path: estadoGlobal.currentPath, name: nombre })
         });
         closeModal();
         toast("Carpeta creada", "success");
-        loadDir(state.currentPath, false);
-      } catch (err) {
-        toast(err.message, "error");
+        loadDir(estadoGlobal.currentPath, false);
+      } catch (errorCapturado) {
+        toast(errorCapturado.message, "error");
       }
     });
   }
 
   function createTextFile() {
-    var name = el("input", { class: "input", type: "text", value: "texto", maxlength: "240" });
-    var textarea = el("textarea", { class: "editor-area", placeholder: "Escribe aquí el texto que quieres guardar…", style: "min-height:240px;max-height:50vh;" });
-    var body = el(
+    var nombre = el("input", { class: "input", type: "text", value: "texto", maxlength: "240" });
+    var areaTexto = el("textarea", { class: "editor-area", placeholder: "Escribe aquí el texto que quieres guardar…", style: "min-height:240px;max-height:50vh;" });
+    var cuerpo = el(
       "div",
       {},
       el("div", { class: "muted", style: "font-size:12px;margin-bottom:6px;", text: "Nombre del archivo" }),
-      name,
+      nombre,
       el("div", { class: "muted", style: "font-size:12px;margin:14px 0 6px;", text: "Contenido" }),
-      textarea
+      areaTexto
     );
     openModal({
       title: "Escribir archivo de texto",
-      body: body,
+      body: cuerpo,
       actions: [
         { label: "Cancelar", class: "ghost", onClick: closeModal },
         { label: "Crear .txt", class: "primary", onClick: save }
       ]
     });
-    name.focus();
+    nombre.focus();
 
     async function save() {
-      var cleanName = name.value.trim();
-      if (cleanName.toLowerCase().endsWith(".txt")) cleanName = cleanName.slice(0, -4);
-      if (!cleanName || cleanName === "." || cleanName === ".." || /[\/\\\0]/.test(cleanName)) {
+      var limpiarNombre = nombre.value.trim();
+      if (limpiarNombre.toLowerCase().endsWith(".txt")) limpiarNombre = limpiarNombre.slice(0, -4);
+      if (!limpiarNombre || limpiarNombre === "." || limpiarNombre === ".." || /[\/\\\0]/.test(limpiarNombre)) {
         toast("Escribe un nombre válido, sin rutas ni barras.", "error");
         return;
       }
-      var filename = cleanName + ".txt";
+      var nombreArchivo = limpiarNombre + ".txt";
       try {
-        var listing = await api("/api/files?path=" + encodeURIComponent(state.currentPath));
-        if ((listing.items || []).some(function (item) { return item.name.toLocaleLowerCase() === filename.toLocaleLowerCase(); })) {
-          toast("Ya existe «" + filename + "» en esta carpeta.", "error");
+        var listado = await api("/api/files?path=" + encodeURIComponent(estadoGlobal.currentPath));
+        if ((listado.items || []).some(function (elemento) { return elemento.name.toLocaleLowerCase() === nombreArchivo.toLocaleLowerCase(); })) {
+          toast("Ya existe «" + nombreArchivo + "» en esta carpeta.", "error");
           return;
         }
-        var path = (state.currentPath ? state.currentPath + "/" : "") + filename;
+        var ruta = (estadoGlobal.currentPath ? estadoGlobal.currentPath + "/" : "") + nombreArchivo;
         await api("/api/files/write", {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ path: path, content: textarea.value })
+          body: JSON.stringify({ path: ruta, content: areaTexto.value })
         });
         closeModal();
-        toast(filename + " creado", "success");
-        loadDir(state.currentPath, false);
-      } catch (err) {
-        toast(err.message, "error");
+        toast(nombreArchivo + " creado", "success");
+        loadDir(estadoGlobal.currentPath, false);
+      } catch (errorCapturado) {
+        toast(errorCapturado.message, "error");
       }
     }
   }
 
-  async function doSearch(query) {
-    if (!query) {
-      loadDir(state.currentPath, false);
+  // Búsqueda global y paleta rápida de comandos.
+  async function doSearch(consulta) {
+    if (!consulta) {
+      loadDir(estadoGlobal.currentPath, false);
       return;
     }
     try {
-      var data = await api(
-        "/api/files/search?path=" + encodeURIComponent(state.currentPath) +
-        "&q=" + encodeURIComponent(query) + "&limit=300"
+      var datos = await api(
+        "/api/files/search?path=" + encodeURIComponent(estadoGlobal.currentPath) +
+        "&q=" + encodeURIComponent(consulta) + "&limit=300"
       );
-      renderItems(data.items);
-      $("count").textContent = data.total + " coincidencias" + (data.truncated ? " · truncado" : "");
-    } catch (err) {
-      if (err.status !== 401) toast(err.message, "error");
+      renderItems(datos.items);
+      $("count").textContent = datos.total + " coincidencias" + (datos.truncated ? " · truncado" : "");
+    } catch (errorCapturado) {
+      if (errorCapturado.status !== 401) toast(errorCapturado.message, "error");
     }
   }
 
   function openPalette() {
     $("palette").classList.remove("hidden");
-    var input = $("palette-input");
-    input.value = "";
-    setTimeout(function () { input.focus(); }, 30);
+    var entrada = $("palette-input");
+    entrada.value = "";
+    setTimeout(function () { entrada.focus(); }, 30);
     paletteSearch("");
   }
 
@@ -782,235 +793,238 @@
     $("palette").classList.add("hidden");
   }
 
-  function paletteSearch(query) {
-    var results = $("palette-results");
-    results.innerHTML = "";
-    var promise;
-    if (query) {
-      promise = api("/api/files/search?path=" + encodeURIComponent(state.currentPath) + "&q=" + encodeURIComponent(query) + "&limit=80");
+  function paletteSearch(consulta) {
+    var resultados = $("palette-results");
+    resultados.innerHTML = "";
+    var promesa;
+    if (consulta) {
+      promesa = api("/api/files/search?path=" + encodeURIComponent(estadoGlobal.currentPath) + "&q=" + encodeURIComponent(consulta) + "&limit=80");
     } else {
-      promise = api("/api/files?path=" + encodeURIComponent(state.currentPath));
+      promesa = api("/api/files?path=" + encodeURIComponent(estadoGlobal.currentPath));
     }
-    promise.then(function (data) {
-      results.innerHTML = "";
-      var items = data.items || [];
-      if (!items.length) {
-        results.append(el("div", { class: "muted", style: "padding:16px;font-size:12px;", text: "Sin coincidencias" }));
+    promesa.then(function (datos) {
+      resultados.innerHTML = "";
+      var elementos = datos.items || [];
+      if (!elementos.length) {
+        resultados.append(el("div", { class: "muted", style: "padding:16px;font-size:12px;", text: "Sin coincidencias" }));
         return;
       }
-      items.forEach(function (item) {
-        var row = el(
+      elementos.forEach(function (elemento) {
+        var fila = el(
           "div",
           { class: "palette-item" },
-          el("span", { class: "palette-icon kind-" + item.kind, html: svgIcon(KIND_ICONS[item.kind] || KIND_ICONS.other) }),
-          el("span", { class: "name", text: item.name }),
-          el("span", { class: "size", text: item.is_dir ? "Carpeta" : humanSize(item.size) })
+          el("span", { class: "palette-icon kind-" + elemento.kind, html: svgIcon(ICONOS_TIPO[elemento.kind] || ICONOS_TIPO.other) }),
+          el("span", { class: "name", text: elemento.name }),
+          el("span", { class: "size", text: elemento.is_dir ? "Carpeta" : humanSize(elemento.size) })
         );
-        row.addEventListener("click", function () {
+        fila.addEventListener("click", function () {
           closePalette();
-          openItem(item);
+          openItem(elemento);
         });
-        results.append(row);
+        resultados.append(fila);
       });
-    }).catch(function (err) {
-      if (err.status !== 401) toast(err.message, "error");
+    }).catch(function (errorCapturado) {
+      if (errorCapturado.status !== 401) toast(errorCapturado.message, "error");
     });
   }
 
-  function showMini(name) {
+  // Subida de archivos con progreso, bloques y reanudación.
+  function showMini(nombre) {
     $("mini-vortex").classList.remove("hidden");
-    $("mini-name").textContent = name;
+    $("mini-name").textContent = nombre;
     $("mini-speed").textContent = "";
     $("mini-bar").style.width = "0%";
   }
 
-  function updateMini(fraction, speed) {
-    $("mini-bar").style.width = Math.max(0, Math.min(100, fraction * 100)) + "%";
-    $("mini-speed").textContent = humanSpeed(speed);
+  function updateMini(fraccion, velocidad) {
+    $("mini-bar").style.width = Math.max(0, Math.min(100, fraccion * 100)) + "%";
+    $("mini-speed").textContent = humanSpeed(velocidad);
   }
 
   function hideMini() {
     $("mini-vortex").classList.add("hidden");
   }
 
-  function uploadDirect(file, target) {
-    return new Promise(function (resolve, reject) {
-      var xhr = new XMLHttpRequest();
-      xhr.open("POST", "/api/files/upload");
-      if (state.token) xhr.setRequestHeader("Authorization", "Bearer " + state.token);
-      var started = performance.now();
-      xhr.upload.onprogress = function (event) {
-        if (event.lengthComputable) {
-          updateMini(event.loaded / event.total, event.loaded / ((performance.now() - started) / 1000));
+  function uploadDirect(archivo, objetivo) {
+    return new Promise(function (resolver, rechazar) {
+      var peticion = new XMLHttpRequest();
+      peticion.open("POST", "/api/files/upload");
+      if (estadoGlobal.token) peticion.setRequestHeader("Authorization", "Bearer " + estadoGlobal.token);
+      var iniciado = performance.now();
+      peticion.upload.onprogress = function (evento) {
+        if (evento.lengthComputable) {
+          updateMini(evento.loaded / evento.total, evento.loaded / ((performance.now() - iniciado) / 1000));
         }
       };
-      xhr.onload = function () {
-        if (xhr.status >= 200 && xhr.status < 400) {
-          resolve();
+      peticion.onload = function () {
+        if (peticion.status >= 200 && peticion.status < 400) {
+          resolver();
         } else {
-          var message = "HTTP " + xhr.status;
+          var mensaje = "HTTP " + peticion.status;
           try {
-            message = detailOf(JSON.parse(xhr.responseText), message);
-          } catch (err) {}
-          reject(new Error(message));
+            mensaje = detailOf(JSON.parse(peticion.responseText), mensaje);
+          } catch (errorCapturado) {}
+          rechazar(new Error(mensaje));
         }
       };
-      xhr.onerror = function () {
-        reject(new Error("Error de red"));
+      peticion.onerror = function () {
+        rechazar(new Error("Error de red"));
       };
-      var form = new FormData();
-      form.append("file", file);
-      form.append("target_dir", target);
-      showMini(file.name);
-      xhr.send(form);
+      var formulario = new FormData();
+      formulario.append("file", archivo);
+      formulario.append("target_dir", objetivo);
+      showMini(archivo.name);
+      peticion.send(formulario);
     });
   }
 
-  async function uploadChunked(file, target) {
-    showMini(file.name);
-    var init = await api("/api/files/upload/init", {
+  async function uploadChunked(archivo, objetivo) {
+    showMini(archivo.name);
+    var inicial = await api("/api/files/upload/init", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ filename: file.name, size: file.size, target_dir: target })
+      body: JSON.stringify({ filename: archivo.name, size: archivo.size, target_dir: objetivo })
     });
-    var offset = 0;
-    var started = performance.now();
-    for (var index = 0; index < init.chunk_count; index++) {
-      var chunk = file.slice(offset, offset + init.chunk_size);
-      var uploaded = false;
-      var lastError = null;
-      for (var attempt = 0; attempt < 3 && !uploaded; attempt++) {
-        var response = await fetch("/api/files/upload/" + init.upload_id + "/" + index, {
+    var desplazamiento = 0;
+    var iniciado = performance.now();
+    for (var indice = 0; indice < inicial.chunk_count; indice++) {
+      var bloque = archivo.slice(desplazamiento, desplazamiento + inicial.chunk_size);
+      var subido = false;
+      var ultimoError = null;
+      for (var intento = 0; intento < 3 && !subido; intento++) {
+        var respuesta = await fetch("/api/files/upload/" + inicial.upload_id + "/" + indice, {
           method: "PUT",
           headers: authHeaders(),
-          body: chunk
+          body: bloque
         });
-        if (response.ok) {
-          uploaded = true;
-        } else if (response.status === 401) {
+        if (respuesta.ok) {
+          subido = true;
+        } else if (respuesta.status === 401) {
           handleUnauthorized();
           throw new Error("Sesión expirada durante la subida");
         } else {
-          lastError = "HTTP " + response.status;
+          ultimoError = "HTTP " + respuesta.status;
           try {
-            lastError = detailOf(await response.json(), lastError);
-          } catch (err) {}
+            ultimoError = detailOf(await respuesta.json(), ultimoError);
+          } catch (errorCapturado) {}
         }
       }
-      if (!uploaded) throw new Error(lastError || "Fallo al subir un bloque");
-      offset += chunk.size;
-      updateMini(offset / Math.max(file.size, 1), offset / ((performance.now() - started) / 1000));
+      if (!subido) throw new Error(ultimoError || "Fallo al subir un bloque");
+      desplazamiento += bloque.size;
+      updateMini(desplazamiento / Math.max(archivo.size, 1), desplazamiento / ((performance.now() - iniciado) / 1000));
     }
-    await api("/api/files/upload/" + init.upload_id + "/complete", { method: "POST" });
+    await api("/api/files/upload/" + inicial.upload_id + "/complete", { method: "POST" });
     updateMini(1, 0);
   }
 
-  async function uploadFiles(files) {
-    if (!files || !files.length) return;
-    var target = state.currentPath;
-    for (var i = 0; i < files.length; i++) {
-      var file = files[i];
+  async function uploadFiles(archivos) {
+    if (!archivos || !archivos.length) return;
+    var objetivo = estadoGlobal.currentPath;
+    for (var i = 0; i < archivos.length; i++) {
+      var archivo = archivos[i];
       try {
-        if (file.size <= DIRECT_LIMIT) await uploadDirect(file, target);
-        else await uploadChunked(file, target);
-        toast("Subido: " + file.name, "success");
-      } catch (err) {
-        toast("Error al subir " + file.name + ": " + err.message, "error");
+        if (archivo.size <= LIMITE_DIRECTO) await uploadDirect(archivo, objetivo);
+        else await uploadChunked(archivo, objetivo);
+        toast("Subido: " + archivo.name, "success");
+      } catch (errorCapturado) {
+        toast("Error al subir " + archivo.name + ": " + errorCapturado.message, "error");
       }
     }
     hideMini();
-    loadDir(target, false);
+    loadDir(objetivo, false);
   }
 
+  // Consola de logs en vivo y cierre de sesión.
   function toggleLogs() {
-    if (state.role !== "host") {
+    if (estadoGlobal.role !== "host") {
       toast("La consola de logs solo está disponible para el host", "error");
       return;
     }
-    var overlay = $("logs-overlay");
-    var hidden = overlay.classList.contains("hidden");
-    if (hidden && !state.logsWs) {
-      var protocol = location.protocol === "https:" ? "wss:" : "ws:";
-      var url = protocol + "//" + location.host + "/api/ws/logs";
-      if (state.token) url += "?token=" + encodeURIComponent(state.token);
+    var superposicion = $("logs-overlay");
+    var oculto = superposicion.classList.contains("hidden");
+    if (oculto && !estadoGlobal.logsWs) {
+      var protocolo = location.protocol === "https:" ? "wss:" : "ws:";
+      var url = protocolo + "//" + location.host + "/api/ws/logs";
+      if (estadoGlobal.token) url += "?token=" + encodeURIComponent(estadoGlobal.token);
       try {
-        state.logsWs = new WebSocket(url);
-        state.logsWs.onmessage = function (event) {
-          var text = event.data;
-          var severity = "INFO";
+        estadoGlobal.logsWs = new WebSocket(url);
+        estadoGlobal.logsWs.onmessage = function (evento) {
+          var texto = evento.data;
+          var severidad = "INFO";
           try {
-            var record = JSON.parse(text);
-            severity = String(record.severity || "INFO");
-            text = [
-              record.timestamp,
-              severity.padEnd(8),
-              record.action,
-              record.client_ip,
-              record.target_path,
-              record.status_code
+            var registro = JSON.parse(texto);
+            severidad = String(registro.severity || "INFO");
+            texto = [
+              registro.timestamp,
+              severidad.padEnd(8),
+              registro.action,
+              registro.client_ip,
+              registro.target_path,
+              registro.status_code
             ].join("  ");
-          } catch (err) {}
-          var body = $("logs-body");
-          body.append(el("div", { class: "log-line sev-" + severity, text: text }));
-          if (body.textContent.length > 120000) {
-            while (body.textContent.length > 90000 && body.firstChild) {
-              body.removeChild(body.firstChild);
+          } catch (errorCapturado) {}
+          var cuerpo = $("logs-body");
+          cuerpo.append(el("div", { class: "log-line sev-" + severidad, text: texto }));
+          if (cuerpo.textContent.length > 120000) {
+            while (cuerpo.textContent.length > 90000 && cuerpo.firstChild) {
+              cuerpo.removeChild(cuerpo.firstChild);
             }
           }
-          body.scrollTop = body.scrollHeight;
+          cuerpo.scrollTop = cuerpo.scrollHeight;
         };
-        state.logsWs.onclose = function () {
-          state.logsWs = null;
+        estadoGlobal.logsWs.onclose = function () {
+          estadoGlobal.logsWs = null;
         };
-      } catch (err) {
+      } catch (errorCapturado) {
         toast("No se pudo abrir la consola", "error");
       }
     }
-    overlay.classList.toggle("hidden");
+    superposicion.classList.toggle("hidden");
   }
 
   function logout() {
     api("/api/auth/logout", { method: "POST" }).catch(function () {});
-    state.token = null;
-    state.role = null;
+    estadoGlobal.token = null;
+    estadoGlobal.role = null;
     localStorage.removeItem("vortex_token");
-    if (state.logsWs) {
-      state.logsWs.close();
-      state.logsWs = null;
+    if (estadoGlobal.logsWs) {
+      estadoGlobal.logsWs.close();
+      estadoGlobal.logsWs = null;
     }
     $("logs-overlay").classList.add("hidden");
     $("logs-body").textContent = "";
-    state.pending = location.pathname + location.search;
+    estadoGlobal.pending = location.pathname + location.search;
     showLogin("");
   }
 
+  // Registro de eventos de la interfaz y arranque final.
   function bindEvents() {
-    $("login-form").addEventListener("submit", async function (event) {
-      event.preventDefault();
-      var secret = $("login-secret").value;
-      if (!secret) return;
+    $("login-form").addEventListener("submit", async function (evento) {
+      evento.preventDefault();
+      var secreto = $("login-secret").value;
+      if (!secreto) return;
       $("login-busy").classList.remove("hidden");
       try {
-        var response = await fetch("/api/auth/login", {
+        var respuesta = await fetch("/api/auth/login", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ secret: secret })
+          body: JSON.stringify({ secret: secreto })
         });
-        if (!response.ok) {
-          var payload = null;
+        if (!respuesta.ok) {
+          var carga = null;
           try {
-            payload = await response.json();
-          } catch (err) {}
-          $("login-error").textContent = detailOf(payload, "Credenciales inválidas");
+            carga = await respuesta.json();
+          } catch (errorCapturado) {}
+          $("login-error").textContent = detailOf(carga, "Credenciales inválidas");
           return;
         }
-        var data = await response.json();
-        state.token = data.access_token;
-        state.role = data.role;
-        localStorage.setItem("vortex_token", state.token);
+        var datos = await respuesta.json();
+        estadoGlobal.token = datos.access_token;
+        estadoGlobal.role = datos.role;
+        localStorage.setItem("vortex_token", estadoGlobal.token);
         $("login-busy").classList.add("hidden");
         await startApp();
-      } catch (err) {
+      } catch (errorCapturado) {
         $("login-error").textContent = "No se pudo conectar con el servidor";
       } finally {
         $("login-busy").classList.add("hidden");
@@ -1047,10 +1061,10 @@
     });
 
     $("btn-up").addEventListener("click", function () {
-      if (state.parent !== null) loadDir(state.parent);
+      if (estadoGlobal.parent !== null) loadDir(estadoGlobal.parent);
     });
     $("btn-refresh").addEventListener("click", function () {
-      loadDir(state.currentPath, false);
+      loadDir(estadoGlobal.currentPath, false);
     });
     $("btn-mkdir").addEventListener("click", createFolder);
     $("btn-new-text").addEventListener("click", createTextFile);
@@ -1058,64 +1072,64 @@
       $("file-input").click();
     });
     $("btn-zip").addEventListener("click", function () {
-      triggerDownloadZip(state.currentPath);
+      triggerDownloadZip(estadoGlobal.currentPath);
     });
-    $("file-input").addEventListener("change", function (event) {
-      uploadFiles(Array.from(event.target.files || []));
-      event.target.value = "";
+    $("file-input").addEventListener("change", function (evento) {
+      uploadFiles(Array.from(evento.target.files || []));
+      evento.target.value = "";
     });
 
-    $("search").addEventListener("input", function (event) {
-      var query = event.target.value.trim();
-      clearTimeout(state.searchTimer);
-      state.searchTimer = setTimeout(function () {
-        doSearch(query);
+    $("search").addEventListener("input", function (evento) {
+      var consulta = evento.target.value.trim();
+      clearTimeout(estadoGlobal.searchTimer);
+      estadoGlobal.searchTimer = setTimeout(function () {
+        doSearch(consulta);
       }, 220);
     });
 
-    $("modal-backdrop").addEventListener("click", function (event) {
-      if (event.target === $("modal-backdrop")) closeModal();
+    $("modal-backdrop").addEventListener("click", function (evento) {
+      if (evento.target === $("modal-backdrop")) closeModal();
     });
 
-    $("palette-input").addEventListener("input", function (event) {
-      var query = event.target.value.trim();
-      clearTimeout(state.paletteTimer);
-      state.paletteTimer = setTimeout(function () {
-        paletteSearch(query);
+    $("palette-input").addEventListener("input", function (evento) {
+      var consulta = evento.target.value.trim();
+      clearTimeout(estadoGlobal.paletteTimer);
+      estadoGlobal.paletteTimer = setTimeout(function () {
+        paletteSearch(consulta);
       }, 200);
     });
-    $("palette").addEventListener("click", function (event) {
-      if (event.target === $("palette")) closePalette();
+    $("palette").addEventListener("click", function (evento) {
+      if (evento.target === $("palette")) closePalette();
     });
 
-    ["dragenter", "dragover"].forEach(function (name) {
-      document.addEventListener(name, function (event) {
-        event.preventDefault();
-        if (!state.token && state.requiresLogin) return;
+    ["dragenter", "dragover"].forEach(function (nombre) {
+      document.addEventListener(nombre, function (evento) {
+        evento.preventDefault();
+        if (!estadoGlobal.token && estadoGlobal.requiresLogin) return;
         $("dropzone").classList.remove("hidden");
       });
     });
-    ["dragleave", "dragend"].forEach(function (name) {
-      document.addEventListener(name, function (event) {
-        if (event.target === document || event.target === document.documentElement) {
+    ["dragleave", "dragend"].forEach(function (nombre) {
+      document.addEventListener(nombre, function (evento) {
+        if (evento.target === document || evento.target === document.documentElement) {
           $("dropzone").classList.add("hidden");
         }
       });
     });
-    document.addEventListener("drop", function (event) {
-      event.preventDefault();
+    document.addEventListener("drop", function (evento) {
+      evento.preventDefault();
       $("dropzone").classList.add("hidden");
-      if (!state.token && state.requiresLogin) return;
-      uploadFiles(Array.from(event.dataTransfer.files || []));
+      if (!estadoGlobal.token && estadoGlobal.requiresLogin) return;
+      uploadFiles(Array.from(evento.dataTransfer.files || []));
     });
 
-    document.addEventListener("keydown", function (event) {
-      var key = (event.key || "").toLowerCase();
-      if (event.ctrlKey && key === "k") {
-        event.preventDefault();
+    document.addEventListener("keydown", function (evento) {
+      var clave = (evento.key || "").toLowerCase();
+      if (evento.ctrlKey && clave === "k") {
+        evento.preventDefault();
         if ($("palette").classList.contains("hidden")) openPalette();
         else closePalette();
-      } else if (key === "escape") {
+      } else if (clave === "escape") {
         if (!$("palette").classList.contains("hidden")) closePalette();
         else if (!$("modal-backdrop").classList.contains("hidden")) closeModal();
         else $("logs-overlay").classList.add("hidden");

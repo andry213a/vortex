@@ -1,3 +1,5 @@
+# Garantiza flujos estándar válidos en ejecutables sin consola.
+
 from __future__ import annotations
 
 import os

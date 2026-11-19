@@ -1,3 +1,5 @@
+# Modelos Pydantic de las peticiones y respuestas de la API.
+
 from __future__ import annotations
 
 from pydantic import BaseModel, Field

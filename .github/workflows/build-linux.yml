@@ -1,3 +1,4 @@
+# Flujo de integración continua que empaqueta Vortex para Linux.
 name: Linux build
 
 on:

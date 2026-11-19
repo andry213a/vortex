@@ -1,3 +1,5 @@
+# Utilidades del sistema: puertos, privilegios y disco.
+
 from __future__ import annotations
 
 import os
@@ -14,23 +16,24 @@ except ImportError:
     psutil = None
 
 
+# Comprobaciones de puertos, permisos y espacio en disco.
 def port_in_use(port: int) -> bool:
     if psutil is not None:
         try:
-            for conn in psutil.net_connections(kind="inet"):
-                if conn.status == psutil.CONN_LISTEN and conn.laddr and conn.laddr.port == port:
+            for conexion in psutil.net_connections(kind="inet"):
+                if conexion.status == psutil.CONN_LISTEN and conexion.laddr and conexion.laddr.port == port:
                     return True
         except (psutil.Error, OSError):
             pass
-    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    conexion_tcp = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     try:
         if os.name == "nt":
-            sock.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)
-        sock.bind(("0.0.0.0", port))
+            conexion_tcp.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)
+        conexion_tcp.bind(("0.0.0.0", port))
     except OSError:
         return True
     finally:
-        sock.close()
+        conexion_tcp.close()
     return False
 
 
@@ -44,18 +47,18 @@ def validate_port(port: int) -> None:
 
 
 def suggest_free_port(start: int = 8080, attempts: int = 50) -> int:
-    for offset in range(attempts):
-        candidate = start + offset
-        if candidate > 65535:
+    for desplazamiento in range(attempts):
+        candidato = start + desplazamiento
+        if candidato > 65535:
             break
-        if not port_in_use(candidate):
-            return candidate
+        if not port_in_use(candidato):
+            return candidato
     return start
 
 
 def disk_usage(path: Path) -> dict[str, int]:
-    usage = shutil.disk_usage(str(path))
-    return {"total": usage.total, "used": usage.used, "free": usage.free}
+    uso = shutil.disk_usage(str(path))
+    return {"total": uso.total, "used": uso.used, "free": uso.free}
 
 
 def is_admin() -> bool:
@@ -72,22 +75,23 @@ def is_admin() -> bool:
         return False
 
 
+# Rutas del sistema que no deben compartirse por accidente.
 def is_protected_path(path: Path) -> bool:
     try:
-        resolved = path.resolve()
+        resuelto = path.resolve()
     except OSError:
         return False
-    if resolved == Path(resolved.anchor):
+    if resuelto == Path(resuelto.anchor):
         return True
     if os.name == "nt":
-        roots = [os.environ.get("ProgramFiles", r"C:\Program Files"), os.environ.get("ProgramFiles(x86)", r"C:\Program Files (x86)"), os.environ.get("SystemRoot", r"C:\Windows")]
-        for root in roots:
-            if root and resolved.is_relative_to(Path(root)):
+        raices = [os.environ.get("ProgramFiles", r"C:\Program Files"), os.environ.get("ProgramFiles(x86)", r"C:\Program Files (x86)"), os.environ.get("SystemRoot", r"C:\Windows")]
+        for raiz in raices:
+            if raiz and resuelto.is_relative_to(Path(raiz)):
                 return True
     else:
-        protected = ["/etc", "/usr", "/bin", "/sbin", "/boot", "/sys", "/proc", "/dev", "/var", "/root", "/opt"]
-        for root in protected:
-            if resolved.is_relative_to(Path(root)):
+        protegidas = ["/etc", "/usr", "/bin", "/sbin", "/boot", "/sys", "/proc", "/dev", "/var", "/root", "/opt"]
+        for raiz in protegidas:
+            if resuelto.is_relative_to(Path(raiz)):
                 return True
     return False
 
@@ -100,22 +104,23 @@ def needs_elevation(path: Path) -> bool:
     return not os.access(str(path), os.W_OK)
 
 
+# Relanzamiento con privilegios cuando la carpeta lo requiere.
 def relaunch_elevated(argv: list[str] | None = None) -> bool:
     argv = list(argv or sys.argv)
     if os.name == "nt":
         try:
             import ctypes
 
-            params = subprocess.list2cmdline(argv[1:])
-            result = ctypes.windll.shell32.ShellExecuteW(None, "runas", argv[0], params, None, 1)
-            return int(result) > 32
+            parametros = subprocess.list2cmdline(argv[1:])
+            resultado = ctypes.windll.shell32.ShellExecuteW(None, "runas", argv[0], parametros, None, 1)
+            return int(resultado) > 32
         except Exception:
             return False
-    command = [sys.executable, *argv[1:]]
-    for launcher in (["pkexec"], ["sudo", "-E"]):
-        if shutil.which(launcher[0]):
+    comando = [sys.executable, *argv[1:]]
+    for lanzador in (["pkexec"], ["sudo", "-E"]):
+        if shutil.which(lanzador[0]):
             try:
-                os.execvp(launcher[0], [*launcher, *command])
+                os.execvp(lanzador[0], [*lanzador, *comando])
             except OSError:
                 continue
     return False

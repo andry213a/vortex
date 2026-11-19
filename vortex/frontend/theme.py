@@ -1,3 +1,5 @@
+# Paleta, tamaños y utilidades visuales compartidas de la interfaz.
+
 from __future__ import annotations
 
 from datetime import datetime
@@ -70,15 +72,15 @@ def color_for_kind(kind: str) -> str:
 def human_size(size: int) -> str:
     if size <= 0:
         return "0 B"
-    units = ["B", "KB", "MB", "GB", "TB"]
-    value = float(size)
-    index = 0
-    while value >= 1024 and index < len(units) - 1:
-        value /= 1024
-        index += 1
-    if index == 0:
-        return f"{int(value)} {units[index]}"
-    return f"{value:.1f} {units[index]}"
+    unidades = ["B", "KB", "MB", "GB", "TB"]
+    valor = float(size)
+    indice = 0
+    while valor >= 1024 and indice < len(unidades) - 1:
+        valor /= 1024
+        indice += 1
+    if indice == 0:
+        return f"{int(valor)} {unidades[indice]}"
+    return f"{valor:.1f} {unidades[indice]}"
 
 
 def human_speed(bytes_per_second: float) -> str:

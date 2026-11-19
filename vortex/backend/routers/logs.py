@@ -1,3 +1,5 @@
+# WebSocket exclusivo del host para la consola de logs.
+
 from __future__ import annotations
 
 import asyncio
@@ -9,47 +11,48 @@ from ..security import is_loopback
 router = APIRouter()
 
 
+# Autorización del WebSocket de logs reservado al host.
 def _websocket_role(websocket: WebSocket, runtime, token: str | None) -> str | None:
     if token:
-        payload = runtime.auth.verify(token)
-        if payload:
-            return str(payload.get("role") or "") or None
-    config = runtime.config
-    host = websocket.client.host if websocket.client else None
-    if config.auth_mode == "none" and is_loopback(host):
+        carga = runtime.auth.verify(token)
+        if carga:
+            return str(carga.get("role") or "") or None
+    configuracion = runtime.config
+    anfitrion = websocket.client.host if websocket.client else None
+    if configuracion.auth_mode == "none" and is_loopback(anfitrion):
         return "host"
     return None
 
 
 @router.websocket("/ws/logs")
 async def logs_socket(websocket: WebSocket, token: str | None = None) -> None:
-    runtime = websocket.app.state.runtime
-    if _websocket_role(websocket, runtime, token) != "host":
+    entorno = websocket.app.state.runtime
+    if _websocket_role(websocket, entorno, token) != "host":
         await websocket.close(code=1008)
         return
     await websocket.accept()
-    loop = asyncio.get_running_loop()
-    queue: asyncio.Queue = asyncio.Queue(maxsize=2000)
+    bucle = asyncio.get_running_loop()
+    cola: asyncio.Queue = asyncio.Queue(maxsize=2000)
 
     def listener(record: dict) -> None:
         def enqueue() -> None:
             try:
-                queue.put_nowait(record)
+                cola.put_nowait(record)
             except asyncio.QueueFull:
                 pass
 
-        loop.call_soon_threadsafe(enqueue)
+        bucle.call_soon_threadsafe(enqueue)
 
-    remove = runtime.audit.add_listener(listener)
+    desuscribir = entorno.audit.add_listener(listener)
     try:
-        for record in runtime.audit.tail(50):
-            await websocket.send_json(record)
+        for registro in entorno.audit.tail(50):
+            await websocket.send_json(registro)
         while True:
-            record = await queue.get()
-            await websocket.send_json(record)
+            registro = await cola.get()
+            await websocket.send_json(registro)
     except WebSocketDisconnect:
         pass
     except Exception:
         pass
     finally:
-        remove()
+        desuscribir()

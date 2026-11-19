@@ -1,3 +1,5 @@
+# Localización de recursos estáticos tanto en desarrollo como empaquetado.
+
 from __future__ import annotations
 
 import sys
@@ -7,17 +9,17 @@ PACKAGE_DIR = Path(__file__).resolve().parent
 
 
 def resource_path(*parts: str) -> Path:
-    relative = Path(*parts)
+    relativa = Path(*parts)
     bases: list[Path] = []
-    bundle_dir = getattr(sys, "_MEIPASS", None)
-    if bundle_dir:
-        bases.append(Path(bundle_dir) / "vortex")
+    directorio_paquete = getattr(sys, "_MEIPASS", None)
+    if directorio_paquete:
+        bases.append(Path(directorio_paquete) / "vortex")
     bases.append(PACKAGE_DIR)
-    for base in bases:
-        candidate = base / relative
-        if candidate.exists():
-            return candidate
-    return bases[-1] / relative
+    for raiz in bases:
+        candidato = raiz / relativa
+        if candidato.exists():
+            return candidato
+    return bases[-1] / relativa
 
 
 def static_dir() -> Path:

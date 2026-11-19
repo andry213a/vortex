@@ -1,3 +1,5 @@
+# Interfaz Flet del host: configuración, navegación, subidas y logs.
+
 from __future__ import annotations
 
 import asyncio
@@ -50,6 +52,7 @@ from .theme import (
 )
 
 
+# Descubrimiento mDNS de otros servidores Vortex en la LAN.
 class _VortexServiceListener(ServiceListener):
     def __init__(self, app: VortexUI) -> None:
         self.app = app
@@ -64,6 +67,7 @@ class _VortexServiceListener(ServiceListener):
         self.app._remove_discovered_server(name)
 
 
+# Interfaz Flet del host: configuración, navegación y operaciones.
 class VortexUI:
     ACCENT_PRESETS: ClassVar[dict[str, str]] = {
         "Azul Vortex": "#60A5FA",
@@ -150,6 +154,7 @@ class VortexUI:
         self.file_picker.on_upload = self._on_file_uploaded
         self._configure_page()
 
+    # Configura la ventana, el tema y los controles iniciales.
     def _configure_page(self) -> None:
         self.page.title = "Vortex"
         self.page.theme_mode = ft.ThemeMode.DARK
@@ -180,8 +185,8 @@ class VortexUI:
         self.is_desktop = not bool(getattr(self.page, "web", False))
         if self.is_desktop:
             self.page.window.bgcolor = BG
-            icon_name = "vortex.ico" if sys.platform.startswith("win") else "vortex.png"
-            self.page.window.icon = str(self._brand_asset_path(icon_name))
+            nombre_icono = "vortex.ico" if sys.platform.startswith("win") else "vortex.png"
+            self.page.window.icon = str(self._brand_asset_path(nombre_icono))
             self.page.window.title_bar_hidden = True
             self.page.window.title_bar_buttons_hidden = True
             self.page.window.minimizable = True
@@ -191,30 +196,30 @@ class VortexUI:
         self.page.on_disconnect = self._on_disconnect
 
     def _window_button(self, icon: str, tooltip: str, action, close: bool = False) -> ft.Container:
-        normal_color = DANGER if close else MUTED
-        hover_bg = "#7F1D1D" if close else SURFACE_ALT
-        button = ft.Container(
+        color_normal = DANGER if close else MUTED
+        fondo_hover = "#7F1D1D" if close else SURFACE_ALT
+        boton = ft.Container(
             width=44,
             height=46,
             alignment=ft.alignment.center,
             tooltip=tooltip,
             on_click=action,
-            content=ft.Icon(name=icon, size=15, color=normal_color),
+            content=ft.Icon(name=icon, size=15, color=color_normal),
         )
 
         def on_hover(e: ft.ControlEvent) -> None:
-            entering = str(getattr(e, "data", "")).lower() == "true"
-            button.bgcolor = hover_bg if entering else None
-            icon_color = "#FFFFFF" if (entering and close) else (TEXT if entering else normal_color)
-            if isinstance(button.content, ft.Icon):
-                button.content.color = icon_color
+            entrando = str(getattr(e, "data", "")).lower() == "true"
+            boton.bgcolor = fondo_hover if entrando else None
+            color_icono = "#FFFFFF" if (entrando and close) else (TEXT if entrando else color_normal)
+            if isinstance(boton.content, ft.Icon):
+                boton.content.color = color_icono
             try:
-                button.update()
+                boton.update()
             except Exception:
                 pass
 
-        button.on_hover = on_hover
-        return button
+        boton.on_hover = on_hover
+        return boton
 
     def _window_controls(self) -> ft.Row:
         def minimize(e: ft.ControlEvent) -> None:
@@ -243,91 +248,92 @@ class VortexUI:
     def _set_accent_globals(color: str) -> None:
         global ACCENT, ACCENT_STRONG
         ACCENT = color.upper()
-        channels = [int(ACCENT[index:index + 2], 16) for index in (1, 3, 5)]
-        ACCENT_STRONG = "#" + "".join(f"{round(channel * 0.78):02X}" for channel in channels)
+        canales = [int(ACCENT[indice:indice + 2], 16) for indice in (1, 3, 5)]
+        ACCENT_STRONG = "#" + "".join(f"{round(canal * 0.78):02X}" for canal in canales)
 
+    # Ajustes visuales: color de acento y preferencias de la ventana.
     def _show_appearance_settings(self, e: ft.ControlEvent | None = None) -> None:
-        current = self.config.accent_color
-        rgb = [int(current[index:index + 2], 16) for index in (1, 3, 5)]
-        preview = ft.Container(width=52, height=36, border_radius=8, bgcolor=current)
-        rgb_fields = [
-            self._field(label, str(value), width=82, keyboard_type=ft.KeyboardType.NUMBER)
-            for label, value in zip(("R", "G", "B"), rgb)
+        actual = self.config.accent_color
+        rgb = [int(actual[indice:indice + 2], 16) for indice in (1, 3, 5)]
+        vista_previa = ft.Container(width=52, height=36, border_radius=8, bgcolor=actual)
+        campos_rgb = [
+            self._field(etiqueta, str(valor), width=82, keyboard_type=ft.KeyboardType.NUMBER)
+            for etiqueta, valor in zip(("R", "G", "B"), rgb)
         ]
-        sliders: list[ft.Slider] = []
+        deslizadores: list[ft.Slider] = []
 
         def update_color() -> None:
-            values = []
-            for field in rgb_fields:
+            valores = []
+            for campo in campos_rgb:
                 try:
-                    value = int(field.value or "0")
+                    valor = int(campo.value or "0")
                 except ValueError:
-                    value = 0
-                values.append(max(0, min(255, value)))
-            color = "#" + "".join(f"{value:02X}" for value in values)
-            preview.bgcolor = color
-            color_label.value = color
-            for index, slider in enumerate(sliders):
-                slider.value = values[index]
+                    valor = 0
+                valores.append(max(0, min(255, valor)))
+            color = "#" + "".join(f"{valor:02X}" for valor in valores)
+            vista_previa.bgcolor = color
+            etiqueta_color.value = color
+            for indice, deslizador in enumerate(deslizadores):
+                deslizador.value = valores[indice]
             try:
                 self.page.update()
             except Exception:
                 pass
 
-        for index, field in enumerate(rgb_fields):
-            field.on_change = lambda ev: update_color()
+        for indice, campo in enumerate(campos_rgb):
+            campo.on_change = lambda ev: update_color()
 
-        for index, value in enumerate(rgb):
-            sliders.append(
+        for indice, valor in enumerate(rgb):
+            deslizadores.append(
                 ft.Slider(
                     min=0,
                     max=255,
                     divisions=255,
-                    value=value,
+                    value=valor,
                     active_color=ACCENT,
-                    on_change=lambda ev, channel=index: set_channel(channel, ev.control.value),
+                    on_change=lambda ev, canal=indice: set_channel(canal, ev.control.value),
                 )
             )
 
         def set_channel(index: int, value: float) -> None:
-            rgb_fields[index].value = str(round(value))
+            campos_rgb[index].value = str(round(value))
             update_color()
 
         def select_preset(color: str) -> None:
-            for field, value in zip(rgb_fields, (int(color[i:i + 2], 16) for i in (1, 3, 5))):
-                field.value = str(value)
+            for campo, valor in zip(campos_rgb, (int(color[indice:indice + 2], 16) for indice in (1, 3, 5))):
+                campo.value = str(valor)
             update_color()
 
         def apply(e: ft.ControlEvent) -> None:
-            old_accent, old_strong = ACCENT, ACCENT_STRONG
-            self.config.accent_color = preview.bgcolor
+            acento_anterior, fuerte_anterior = ACCENT, ACCENT_STRONG
+            self.config.accent_color = vista_previa.bgcolor
             self._set_accent_globals(self.config.accent_color)
             try:
                 self.store.save(self.config)
-            except OSError as exc:
-                self._notify(f"No se pudo guardar el color: {exc}", True)
+            except OSError as excepcion:
+                self._notify(f"No se pudo guardar el color: {excepcion}", True)
                 return
-            self._recolor_existing_controls(old_accent, old_strong)
-            self.page.close(dialog)
+            self._recolor_existing_controls(acento_anterior, fuerte_anterior)
+            self.page.close(dialogo)
             self._notify("Color de Vortex actualizado")
 
-        presets = ft.Row(
+        ajustes = ft.Row(
             [
                 ft.Container(
                     width=30,
                     height=30,
                     border_radius=15,
                     bgcolor=color,
-                    tooltip=name,
+                    tooltip=nombre,
                     on_click=lambda ev, selected=color: select_preset(selected),
-                    border=ft.border.all(2, TEXT if color == current else BORDER),
+                    border=ft.border.all(2, TEXT if color == actual else BORDER),
                 )
-                for name, color in self.ACCENT_PRESETS.items()
+                for nombre, color in self.ACCENT_PRESETS.items()
             ],
             spacing=12,
         )
-        color_label = ft.Text(current, color=TEXT, font_family="monospace")
-        dialog = ft.AlertDialog(
+        etiqueta_color = ft.Text(actual, color=TEXT, font_family="monospace")
+        dialogo = ft.AlertDialog(
             modal=True,
             title=ft.Text("Color de la aplicación", color=TEXT),
             content=ft.Container(
@@ -335,51 +341,51 @@ class VortexUI:
                 content=ft.Column(
                     [
                         ft.Text("Colores sugeridos", color=MUTED, size=12),
-                        presets,
+                        ajustes,
                         ft.Divider(color=BORDER),
                         ft.Text("Ajuste RGB", color=MUTED, size=12),
                         *[
-                            ft.Row([ft.Text(label, width=20, color=TEXT), slider, field], spacing=8)
-                            for label, slider, field in zip(("R", "G", "B"), sliders, rgb_fields)
+                            ft.Row([ft.Text(etiqueta, width=20, color=TEXT), deslizador, campo], spacing=8)
+                            for etiqueta, deslizador, campo in zip(("R", "G", "B"), deslizadores, campos_rgb)
                         ],
-                        ft.Row([preview, color_label]),
+                        ft.Row([vista_previa, etiqueta_color]),
                     ],
                     tight=True,
                     spacing=10,
                 ),
             ),
             actions=[
-                ft.TextButton("Cancelar", on_click=lambda ev: self.page.close(dialog)),
+                ft.TextButton("Cancelar", on_click=lambda ev: self.page.close(dialogo)),
                 ft.ElevatedButton("Aplicar", bgcolor=ACCENT_STRONG, color="#FFFFFF", on_click=apply),
             ],
         )
-        self.page.open(dialog)
+        self.page.open(dialogo)
 
     def _recolor_existing_controls(self, old_accent: str, old_strong: str) -> None:
-        seen: set[int] = set()
+        vistos: set[int] = set()
 
         def visit(control: ft.Control) -> None:
-            if id(control) in seen:
+            if id(control) in vistos:
                 return
-            seen.add(id(control))
-            for attribute in ("color", "bgcolor", "active_color", "border_color", "focused_border_color"):
+            vistos.add(id(control))
+            for atributo in ("color", "bgcolor", "active_color", "border_color", "focused_border_color"):
                 try:
-                    value = getattr(control, attribute)
-                    if value == old_accent:
-                        setattr(control, attribute, ACCENT)
-                    elif value == old_strong:
-                        setattr(control, attribute, ACCENT_STRONG)
+                    valor = getattr(control, atributo)
+                    if valor == old_accent:
+                        setattr(control, atributo, ACCENT)
+                    elif valor == old_strong:
+                        setattr(control, atributo, ACCENT_STRONG)
                 except Exception:
                     pass
-            for attribute in ("content", "controls"):
+            for atributo in ("content", "controls"):
                 try:
-                    children = getattr(control, attribute)
-                    if isinstance(children, ft.Control):
-                        visit(children)
-                    elif isinstance(children, list):
-                        for child in children:
-                            if isinstance(child, ft.Control):
-                                visit(child)
+                    hijos = getattr(control, atributo)
+                    if isinstance(hijos, ft.Control):
+                        visit(hijos)
+                    elif isinstance(hijos, list):
+                        for hijo in hijos:
+                            if isinstance(hijo, ft.Control):
+                                visit(hijo)
                 except Exception:
                     pass
 
@@ -394,11 +400,12 @@ class VortexUI:
         except Exception:
             pass
 
+    # Barra de título propia con controles de ventana.
     def _title_bar(self) -> ft.Container:
-        running = self.server.running or self.is_remote
-        status_color = SUCCESS if running else MUTED
-        status_text = "REMOTO" if self.is_remote else "EN LÍNEA" if running else "DETENIDO"
-        brand = ft.Row(
+        en_ejecucion = self.server.running or self.is_remote
+        color_estado = SUCCESS if en_ejecucion else MUTED
+        texto_estado = "REMOTO" if self.is_remote else "EN LÍNEA" if en_ejecucion else "DETENIDO"
+        marca = ft.Row(
             [
                 ft.Container(
                     width=26,
@@ -418,8 +425,8 @@ class VortexUI:
                     border=ft.border.all(1, BORDER),
                     content=ft.Row(
                         [
-                            ft.Container(width=6, height=6, border_radius=3, bgcolor=status_color),
-                            ft.Text(status_text, size=9, color=status_color, weight=ft.FontWeight.W_600),
+                            ft.Container(width=6, height=6, border_radius=3, bgcolor=color_estado),
+                            ft.Text(texto_estado, size=9, color=color_estado, weight=ft.FontWeight.W_600),
                         ],
                         spacing=5,
                         vertical_alignment=ft.CrossAxisAlignment.CENTER,
@@ -430,8 +437,8 @@ class VortexUI:
             vertical_alignment=ft.CrossAxisAlignment.CENTER,
             expand=True,
         )
-        drag_area = ft.WindowDragArea(
-            content=ft.Container(content=brand, padding=ft.padding.only(left=14, right=10)),
+        area_arrastre = ft.WindowDragArea(
+            content=ft.Container(content=marca, padding=ft.padding.only(left=14, right=10)),
             expand=True,
             maximizable=True,
         )
@@ -440,7 +447,7 @@ class VortexUI:
             bgcolor=SURFACE,
             border=ft.border.only(bottom=ft.BorderSide(1, BORDER)),
             content=ft.Row(
-                [drag_area, self._window_controls()],
+                [area_arrastre, self._window_controls()],
                 spacing=0,
                 vertical_alignment=ft.CrossAxisAlignment.CENTER,
             ),
@@ -453,11 +460,11 @@ class VortexUI:
     @classmethod
     def _brand_image(cls, size: int) -> ft.Control:
         try:
-            encoded_logo = base64.b64encode(cls._brand_asset_path().read_bytes()).decode("ascii")
+            logo_codificado = base64.b64encode(cls._brand_asset_path().read_bytes()).decode("ascii")
         except OSError:
             return ft.Icon(name=ft.icons.BOLT, size=max(16, size - 6), color=ACCENT)
         return ft.Image(
-            src_base64=encoded_logo,
+            src_base64=logo_codificado,
             width=size,
             height=size,
             fit=ft.ImageFit.CONTAIN,
@@ -477,6 +484,7 @@ class VortexUI:
         self._start_polling()
         self._start_discovery()
 
+    # Anuncio y descubrimiento de servidores en la red local.
     def _start_discovery(self) -> None:
         if self.discovery_browser is not None:
             return
@@ -487,8 +495,8 @@ class VortexUI:
                 "_http._tcp.local.",
                 self.discovery_listener,
             )
-        except Exception as exc:
-            self.discovery_error = str(exc)
+        except Exception as excepcion:
+            self.discovery_error = str(excepcion)
 
     def _stop_discovery(self) -> None:
         if self.discovery_browser is not None:
@@ -506,27 +514,27 @@ class VortexUI:
 
     def _resolve_discovered_server(self, zeroconf: Zeroconf, service_type: str, name: str) -> None:
         try:
-            info = zeroconf.get_service_info(service_type, name, timeout=1500)
-            if info is None or (info.properties or {}).get(b"auth") != b"vortex":
+            informacion = zeroconf.get_service_info(service_type, name, timeout=1500)
+            if informacion is None or (informacion.properties or {}).get(b"auth") != b"vortex":
                 return
-            addresses = info.parsed_addresses()
-            if not addresses:
+            direcciones = informacion.parsed_addresses()
+            if not direcciones:
                 return
-            address = next(
-                (item for item in addresses if ipaddress.ip_address(item).version == 4),
-                addresses[0],
+            direccion = next(
+                (elemento for elemento in direcciones if ipaddress.ip_address(elemento).version == 4),
+                direcciones[0],
             )
-            formatted_address = f"[{address}]" if ipaddress.ip_address(address).version == 6 else address
-            url = f"http://{formatted_address}:{info.port}"
-            display_name = name.split(f".{service_type}", 1)[0]
-            if display_name.startswith("Vortex on "):
-                display_name = display_name.removeprefix("Vortex on ")
+            direccion_formateada = f"[{direccion}]" if ipaddress.ip_address(direccion).version == 6 else direccion
+            url = f"http://{direccion_formateada}:{informacion.port}"
+            nombre_visible = name.split(f".{service_type}", 1)[0]
+            if nombre_visible.startswith("Vortex on "):
+                nombre_visible = nombre_visible.removeprefix("Vortex on ")
             with self.discovery_lock:
-                previous_url = self.discovered_service_urls.get(name)
-                if previous_url and previous_url != url:
-                    self.discovered_servers.pop(previous_url, None)
+                url_anterior = self.discovered_service_urls.get(name)
+                if url_anterior and url_anterior != url:
+                    self.discovered_servers.pop(url_anterior, None)
                 self.discovered_service_urls[name] = url
-                self.discovered_servers[url] = {"name": display_name or "Servidor Vortex", "url": url}
+                self.discovered_servers[url] = {"name": nombre_visible or "Servidor Vortex", "url": url}
         except Exception:
             return
 
@@ -541,28 +549,28 @@ class VortexUI:
         if control is None:
             return
         with self.discovery_lock:
-            servers = tuple(sorted(
-                ((item["name"], item["url"]) for item in self.discovered_servers.values()),
+            servidores = tuple(sorted(
+                ((elemento["name"], elemento["url"]) for elemento in self.discovered_servers.values()),
                 key=lambda item: (item[0].casefold(), item[1]),
             ))
-        if servers:
-            status_message = f"{len(servers)} servidor(es) · actualizado {time.strftime('%H:%M:%S')}"
+        if servidores:
+            mensaje_estado = f"{len(servidores)} servidor(es) · actualizado {time.strftime('%H:%M:%S')}"
         elif self.discovery_error:
-            status_message = "No se pudo buscar automáticamente. Puedes escribir la IP abajo."
+            mensaje_estado = "No se pudo buscar automáticamente. Puedes escribir la IP abajo."
         elif time.monotonic() - self.discovery_started_at < 8:
-            status_message = "Buscando servidores Vortex en la red local…"
+            mensaje_estado = "Buscando servidores Vortex en la red local…"
         else:
-            status_message = "No se encontraron servidores. Puedes escribir la IP abajo."
-        signature = (status_message, *(f"{name}|{url}" for name, url in servers))
-        if signature == self.discovered_render_signature:
+            mensaje_estado = "No se encontraron servidores. Puedes escribir la IP abajo."
+        firma = (mensaje_estado, *(f"{nombre}|{url}" for nombre, url in servidores))
+        if firma == self.discovered_render_signature:
             return
-        self.discovered_render_signature = signature
+        self.discovered_render_signature = firma
         control.controls.clear()
-        status = self.discovered_status
-        if status is not None:
-            status.value = status_message
-        if servers:
-            for name, url in servers:
+        estado = self.discovered_status
+        if estado is not None:
+            estado.value = mensaje_estado
+        if servidores:
+            for nombre, url in servidores:
                 control.controls.append(
                     ft.Container(
                         padding=ft.padding.symmetric(horizontal=10, vertical=8),
@@ -575,7 +583,7 @@ class VortexUI:
                                 ft.Icon(name=ft.icons.DNS_OUTLINED, color=ACCENT, size=18),
                                 ft.Column(
                                     [
-                                        ft.Text(name, color=TEXT, size=12, weight=ft.FontWeight.W_600),
+                                        ft.Text(nombre, color=TEXT, size=12, weight=ft.FontWeight.W_600),
                                         ft.Text(url, color=MUTED, size=11, font_family="monospace"),
                                     ],
                                     spacing=2,
@@ -600,9 +608,9 @@ class VortexUI:
     def _default_directory(self) -> str:
         if self.config.base_dir:
             return self.config.base_dir
-        for candidate in (Path.home() / "documento", Path.home() / "Documents", Path.home()):
-            if candidate.exists():
-                return str(candidate)
+        for candidato in (Path.home() / "documento", Path.home() / "Documents", Path.home()):
+            if candidato.exists():
+                return str(candidato)
         return str(Path.cwd())
 
     def _on_disconnect(self, e: ft.ControlEvent) -> None:
@@ -613,13 +621,13 @@ class VortexUI:
             pass
 
     def _notify(self, message: str, error: bool = False) -> None:
-        snack = ft.SnackBar(
+        aviso = ft.SnackBar(
             content=ft.Text(message, color=TEXT, size=13),
             bgcolor=DANGER if error else SURFACE,
             duration=4500,
         )
         try:
-            self.page.open(snack)
+            self.page.open(aviso)
         except Exception:
             pass
 
@@ -648,6 +656,7 @@ class VortexUI:
             content=content,
         )
 
+    # Asistente inicial para elegir carpeta, puerto y autenticación.
     def show_setup(self) -> None:
         self.token = None
         self.role = None
@@ -726,7 +735,7 @@ class VortexUI:
             vertical_alignment=ft.CrossAxisAlignment.CENTER,
         )
 
-        start_button = ft.ElevatedButton(
+        boton_iniciar = ft.ElevatedButton(
             text="Iniciar servidor",
             icon=ft.icons.PLAY_ARROW,
             bgcolor=ACCENT_STRONG,
@@ -741,7 +750,7 @@ class VortexUI:
             on_click=self._start_server,
         )
 
-        form = ft.Column(
+        formulario = ft.Column(
             [
                 logo,
                 ft.Divider(color=BORDER),
@@ -771,7 +780,7 @@ class VortexUI:
                             color=MUTED,
                             expand=True,
                         ),
-                        start_button,
+                        boton_iniciar,
                     ],
                     spacing=16,
                     vertical_alignment=ft.CrossAxisAlignment.CENTER,
@@ -797,22 +806,23 @@ class VortexUI:
             spacing=14,
         )
 
-        page_content = ft.Container(
+        contenido_pagina = ft.Container(
             expand=True,
             bgcolor=BG,
             alignment=ft.alignment.center,
             content=ft.Column(
-                [self._card(form)],
+                [self._card(formulario)],
                 alignment=ft.MainAxisAlignment.CENTER,
                 horizontal_alignment=ft.CrossAxisAlignment.CENTER,
             ),
         )
-        self._set_root(page_content)
+        self._set_root(contenido_pagina)
 
+    # Conexión a un servidor remoto descubierto o escrito a mano.
     def _show_connect_dialog(self, e: ft.ControlEvent | None = None) -> None:
-        host_field = self._field("IP o dirección del servidor", value="", hint_text="192.168.1.25 o http://vortex.local")
-        port_field = self._field("Puerto", value="8080", width=120, keyboard_type=ft.KeyboardType.NUMBER)
-        error_text = ft.Text("", color=DANGER, size=12)
+        campo_host = self._field("IP o dirección del servidor", value="", hint_text="192.168.1.25 o http://vortex.local")
+        campo_puerto = self._field("Puerto", value="8080", width=120, keyboard_type=ft.KeyboardType.NUMBER)
+        texto_error = ft.Text("", color=DANGER, size=12)
         self.discovered_status = ft.Text("Buscando servidores Vortex en la red local…", color=MUTED, size=11)
         self.discovered_servers_control = ft.Column(
             height=135,
@@ -822,30 +832,30 @@ class VortexUI:
         self.discovered_render_signature = None
 
         def connect(ev: ft.ControlEvent) -> None:
-            raw_host = (host_field.value or "").strip()
+            host_crudo = (campo_host.value or "").strip()
             try:
-                port = int((port_field.value or "8080").strip())
-                if not 1 <= port <= 65535:
+                puerto = int((campo_puerto.value or "8080").strip())
+                if not 1 <= puerto <= 65535:
                     raise ValueError
             except ValueError:
-                error_text.value = "El puerto debe ser un número entre 1 y 65535"
+                texto_error.value = "El puerto debe ser un número entre 1 y 65535"
                 self.page.update()
                 return
-            if not raw_host:
-                error_text.value = "Escribe la IP o el nombre del servidor"
+            if not host_crudo:
+                texto_error.value = "Escribe la IP o el nombre del servidor"
                 self.page.update()
                 return
             try:
-                remote_url = self._normalize_remote_url(raw_host, port)
-            except ValueError as exc:
-                error_text.value = str(exc)
+                url_remota = self._normalize_remote_url(host_crudo, puerto)
+            except ValueError as excepcion:
+                texto_error.value = str(excepcion)
                 self.page.update()
                 return
-            self.page.close(dialog)
-            self._connect_remote(remote_url)
+            self.page.close(dialogo)
+            self._connect_remote(url_remota)
 
-        host_field.on_submit = connect
-        dialog = ft.AlertDialog(
+        campo_host.on_submit = connect
+        dialogo = ft.AlertDialog(
             modal=True,
             title=ft.Text("Conectar a un servidor Vortex", color=TEXT),
             content=ft.Container(
@@ -868,22 +878,22 @@ class VortexUI:
                         self.discovered_servers_control,
                         ft.Divider(color=BORDER, height=8),
                         ft.Text("O escribe la IP y el puerto manualmente:", color=MUTED, size=12),
-                        host_field,
-                        port_field,
-                        error_text,
+                        campo_host,
+                        campo_puerto,
+                        texto_error,
                     ],
                     tight=True,
                     spacing=12,
                 ),
             ),
             actions=[
-                ft.TextButton("Cancelar", on_click=lambda ev: self.page.close(dialog)),
+                ft.TextButton("Cancelar", on_click=lambda ev: self.page.close(dialogo)),
                 ft.ElevatedButton("Conectar", icon=ft.icons.LINK, bgcolor=ACCENT_STRONG, color="#FFFFFF", on_click=connect),
             ],
             actions_alignment=ft.MainAxisAlignment.END,
         )
-        self.connect_dialog = dialog
-        self.page.open(dialog)
+        self.connect_dialog = dialogo
+        self.page.open(dialogo)
         self._refresh_discovered_servers()
 
     def _refresh_local_discovery(self, e: ft.ControlEvent | None = None) -> None:
@@ -900,58 +910,58 @@ class VortexUI:
                     "_http._tcp.local.",
                     self.discovery_listener,
                 )
-            except Exception as exc:
-                self.discovery_error = str(exc)
+            except Exception as excepcion:
+                self.discovery_error = str(excepcion)
         self._refresh_discovered_servers()
 
     @staticmethod
     def _normalize_remote_url(value: str, default_port: int) -> str:
-        raw = value if "://" in value else f"http://{value}"
-        parsed = urlsplit(raw)
-        if parsed.scheme not in {"http", "https"} or not parsed.hostname:
+        crudo = value if "://" in value else f"http://{value}"
+        analizado = urlsplit(crudo)
+        if analizado.scheme not in {"http", "https"} or not analizado.hostname:
             raise ValueError("Usa una dirección http:// o https:// válida")
-        if parsed.username or parsed.password:
+        if analizado.username or analizado.password:
             raise ValueError("No incluyas credenciales en la dirección del servidor")
-        if parsed.path not in {"", "/"} or parsed.query or parsed.fragment:
+        if analizado.path not in {"", "/"} or analizado.query or analizado.fragment:
             raise ValueError("Escribe solo la IP o el nombre del servidor, sin rutas adicionales")
         try:
-            existing_port = parsed.port
-        except ValueError as exc:
-            raise ValueError("El puerto de la dirección no es válido") from exc
-        netloc = parsed.netloc if existing_port is not None else f"{parsed.netloc}:{default_port}"
-        return urlunsplit((parsed.scheme, netloc, "", "", ""))
+            puerto_existente = analizado.port
+        except ValueError as excepcion:
+            raise ValueError("El puerto de la dirección no es válido") from excepcion
+        dominio = analizado.netloc if puerto_existente is not None else f"{analizado.netloc}:{default_port}"
+        return urlunsplit((analizado.scheme, dominio, "", "", ""))
 
     def _connect_remote(self, remote_url: str) -> None:
-        client = httpx.Client(base_url=remote_url, timeout=httpx.Timeout(10.0, read=None))
+        cliente = httpx.Client(base_url=remote_url, timeout=httpx.Timeout(10.0, read=None))
         try:
-            response = client.get("/api/auth/status")
-            response.raise_for_status()
-            auth_status = response.json()
-        except (httpx.HTTPError, ValueError) as exc:
-            client.close()
-            self._notify(f"No se pudo conectar con {remote_url}: {exc}", True)
+            respuesta = cliente.get("/api/auth/status")
+            respuesta.raise_for_status()
+            estado_auth = respuesta.json()
+        except (httpx.HTTPError, ValueError) as excepcion:
+            cliente.close()
+            self._notify(f"No se pudo conectar con {remote_url}: {excepcion}", True)
             return
-        self.http = client
+        self.http = cliente
         self.base_url = remote_url
         self.file_revision = 0
         self.file_sync_checked_at = 0.0
         self.is_remote = True
         self.token = None
         self.role = None
-        self.remote_auth_mode = str(auth_status.get("auth_mode", "none"))
-        self.remote_requires_login = bool(auth_status.get("requires_login"))
-        self.remote_guest_write = bool(auth_status.get("guest_write", True))
+        self.remote_auth_mode = str(estado_auth.get("auth_mode", "none"))
+        self.remote_requires_login = bool(estado_auth.get("requires_login"))
+        self.remote_guest_write = bool(estado_auth.get("guest_write", True))
         self._start_polling()
         if self.remote_requires_login:
             self.show_login()
             return
         try:
-            response = client.get("/api/auth/me")
-            response.raise_for_status()
-            self.role = response.json().get("role", "guest_read")
-        except (httpx.HTTPError, ValueError) as exc:
+            respuesta = cliente.get("/api/auth/me")
+            respuesta.raise_for_status()
+            self.role = respuesta.json().get("role", "guest_read")
+        except (httpx.HTTPError, ValueError) as excepcion:
             self._disconnect_remote(None)
-            self._notify(f"El servidor respondió, pero no permitió el acceso: {exc}", True)
+            self._notify(f"El servidor respondió, pero no permitió el acceso: {excepcion}", True)
             return
         self.current_path = ""
         self.show_browser()
@@ -974,13 +984,13 @@ class VortexUI:
         self.show_browser()
 
     def _render_auth_extra(self) -> None:
-        mode = self.auth_dropdown.value
+        modo = self.auth_dropdown.value
         self.auth_extra.controls.clear()
-        if mode == "auto":
+        if modo == "auto":
             self.auth_extra.controls.append(
                 ft.Row([self.token_field, self.regenerate_button], spacing=8, vertical_alignment=ft.CrossAxisAlignment.CENTER)
             )
-        elif mode == "manual":
+        elif modo == "manual":
             self.auth_extra.controls.append(self.password_field)
         else:
             self.auth_extra.controls.append(
@@ -1011,18 +1021,18 @@ class VortexUI:
         self.dir_picker.get_directory_path(dialog_title="Seleccionar carpeta raíz")
 
     def _show_folder_picker(self) -> None:
-        current = Path(self.dir_field.value or Path.home()).expanduser()
-        if not current.is_dir():
-            current = Path.home()
-        self._show_local_picker(current, "folder")
+        actual = Path(self.dir_field.value or Path.home()).expanduser()
+        if not actual.is_dir():
+            actual = Path.home()
+        self._show_local_picker(actual, "folder")
 
     def _show_file_picker(self) -> None:
-        current = Path(self.config.base_dir or Path.home()).expanduser()
+        actual = Path(self.config.base_dir or Path.home()).expanduser()
         if self.current_path:
-            current = current / self.current_path
-        if not current.is_dir():
-            current = Path.home()
-        self._show_local_picker(current, "files")
+            actual = actual / self.current_path
+        if not actual.is_dir():
+            actual = Path.home()
+        self._show_local_picker(actual, "files")
 
     def _show_local_picker(self, current: Path, mode: str) -> None:
         self.folder_picker_path = current.resolve()
@@ -1031,10 +1041,10 @@ class VortexUI:
         self.folder_picker_path_text = ft.Text("", size=12, color=TEXT, selectable=True, font_family="monospace")
         self.folder_picker_selection_text = ft.Text("", size=11, color=MUTED)
         self.folder_picker_list = ft.ListView(expand=True, spacing=2, controls=[])
-        folder_mode = mode == "folder"
-        dialog = ft.AlertDialog(
+        modo_carpeta = mode == "folder"
+        dialogo = ft.AlertDialog(
             modal=True,
-            title=ft.Text("Seleccionar carpeta raíz" if folder_mode else "Seleccionar archivos", color=TEXT),
+            title=ft.Text("Seleccionar carpeta raíz" if modo_carpeta else "Seleccionar archivos", color=TEXT),
             content=ft.Container(
                 width=600,
                 height=460,
@@ -1055,20 +1065,20 @@ class VortexUI:
                 ),
             ),
             actions=[
-                ft.TextButton("Cancelar", on_click=lambda ev: self.page.close(dialog)),
+                ft.TextButton("Cancelar", on_click=lambda ev: self.page.close(dialogo)),
                 ft.ElevatedButton(
-                    "Usar esta carpeta" if folder_mode else "Subir archivos",
-                    icon=ft.icons.CHECK if folder_mode else ft.icons.UPLOAD_FILE,
+                    "Usar esta carpeta" if modo_carpeta else "Subir archivos",
+                    icon=ft.icons.CHECK if modo_carpeta else ft.icons.UPLOAD_FILE,
                     bgcolor=ACCENT_STRONG,
                     color="#FFFFFF",
-                    on_click=lambda ev: self._use_folder_picker_path(dialog) if folder_mode else self._use_file_picker_selection(dialog),
+                    on_click=lambda ev: self._use_folder_picker_path(dialogo) if modo_carpeta else self._use_file_picker_selection(dialogo),
                 ),
             ],
             actions_alignment=ft.MainAxisAlignment.END,
         )
-        self.folder_picker_dialog = dialog
+        self.folder_picker_dialog = dialogo
         self._render_folder_picker()
-        self.page.open(dialog)
+        self.page.open(dialogo)
 
     def _render_folder_picker(self) -> None:
         if self.folder_picker_list is None or self.folder_picker_path_text is None or self.folder_picker_selection_text is None:
@@ -1081,25 +1091,25 @@ class VortexUI:
         )
         self.folder_picker_list.controls.clear()
         try:
-            entries = list(self.folder_picker_path.iterdir())
-            folders = sorted((entry for entry in entries if entry.is_dir()), key=lambda entry: entry.name.casefold())
-            files = sorted((entry for entry in entries if entry.is_file()), key=lambda entry: entry.name.casefold())
-        except OSError as exc:
-            self.folder_picker_list.controls.append(ft.Text(f"No se pudo leer esta carpeta: {exc}", color=DANGER, size=12))
+            entradas = list(self.folder_picker_path.iterdir())
+            carpetas = sorted((entrada for entrada in entradas if entrada.is_dir()), key=lambda entrada: entrada.name.casefold())
+            archivos = sorted((entrada for entrada in entradas if entrada.is_file()), key=lambda entrada: entrada.name.casefold())
+        except OSError as excepcion:
+            self.folder_picker_list.controls.append(ft.Text(f"No se pudo leer esta carpeta: {excepcion}", color=DANGER, size=12))
             self.page.update()
             return
-        if not folders and self.folder_picker_mode == "folder":
+        if not carpetas and self.folder_picker_mode == "folder":
             self.folder_picker_list.controls.append(ft.Text("No hay subcarpetas aquí.", color=MUTED, size=12))
-        for folder in folders:
+        for carpeta in carpetas:
             self.folder_picker_list.controls.append(
                 ft.Container(
                     padding=ft.padding.symmetric(horizontal=8, vertical=6),
                     border_radius=8,
-                    on_click=lambda ev, target=folder: self._open_folder_picker_path(target),
+                    on_click=lambda ev, target=carpeta: self._open_folder_picker_path(target),
                     content=ft.Row(
                         [
                             ft.Icon(name=ft.icons.FOLDER, color=ACCENT, size=19),
-                            ft.Text(folder.name, color=TEXT, size=13, expand=True, overflow=ft.TextOverflow.ELLIPSIS),
+                            ft.Text(carpeta.name, color=TEXT, size=13, expand=True, overflow=ft.TextOverflow.ELLIPSIS),
                             ft.Icon(name=ft.icons.CHEVRON_RIGHT, color=MUTED, size=18),
                         ],
                         spacing=8,
@@ -1107,27 +1117,27 @@ class VortexUI:
                 )
             )
         if self.folder_picker_mode == "files":
-            for path in files:
-                kind = file_kind(path.name, False)
+            for ruta in archivos:
+                tipo = file_kind(ruta.name, False)
                 self.folder_picker_list.controls.append(
                     ft.Container(
                         padding=ft.padding.symmetric(horizontal=8, vertical=3),
                         border_radius=8,
                         content=ft.Row(
                             [
-                                ft.Icon(name=icon_for_kind(kind), color=color_for_kind(kind), size=18),
+                                ft.Icon(name=icon_for_kind(tipo), color=color_for_kind(tipo), size=18),
                                 ft.Checkbox(
-                                    label=path.name,
-                                    value=path in self.folder_picker_selected,
+                                    label=ruta.name,
+                                    value=ruta in self.folder_picker_selected,
                                     expand=True,
-                                    on_change=lambda ev, target=path: self._toggle_file_picker_selection(target, bool(ev.control.value)),
+                                    on_change=lambda ev, target=ruta: self._toggle_file_picker_selection(target, bool(ev.control.value)),
                                 ),
                             ],
                             spacing=8,
                         ),
                     )
                 )
-            if not folders and not files:
+            if not carpetas and not archivos:
                 self.folder_picker_list.controls.append(ft.Text("Esta carpeta está vacía.", color=MUTED, size=12))
         self.page.update()
 
@@ -1143,9 +1153,9 @@ class VortexUI:
         self._render_folder_picker()
 
     def _folder_picker_up(self, e: ft.ControlEvent) -> None:
-        parent = self.folder_picker_path.parent
-        if parent != self.folder_picker_path:
-            self.folder_picker_path = parent
+        padre = self.folder_picker_path.parent
+        if padre != self.folder_picker_path:
+            self.folder_picker_path = padre
             self._render_folder_picker()
 
     def _use_folder_picker_path(self, dialog: ft.AlertDialog) -> None:
@@ -1157,28 +1167,29 @@ class VortexUI:
         if not self.folder_picker_selected:
             self._notify("Selecciona uno o más archivos para subir", True)
             return
-        paths = [str(path) for path in sorted(self.folder_picker_selected, key=lambda item: item.name.casefold())]
+        rutas = [str(ruta) for ruta in sorted(self.folder_picker_selected, key=lambda item: item.name.casefold())]
         self.page.close(dialog)
-        threading.Thread(target=self._upload_worker, args=(paths,), daemon=True).start()
+        threading.Thread(target=self._upload_worker, args=(rutas,), daemon=True).start()
 
     def _on_dir_picked(self, e: ft.FilePickerResultEvent) -> None:
         if e.path:
             self.dir_field.value = e.path
             self.page.update()
 
+    # Arranque del servidor local con la configuración validada.
     def _start_server(self, e: ft.ControlEvent) -> None:
-        base = (self.dir_field.value or "").strip()
-        if not base:
+        raiz = (self.dir_field.value or "").strip()
+        if not raiz:
             self._notify("Selecciona una carpeta raíz", True)
             return
         try:
-            port = int((self.port_field.value or "").strip())
+            puerto = int((self.port_field.value or "").strip())
         except ValueError:
             self._notify("El puerto debe ser un número entero entre 1 y 65535", True)
             return
-        cfg = ServerConfig(
-            base_dir=base,
-            port=port,
+        configuracion = ServerConfig(
+            base_dir=raiz,
+            port=puerto,
             auth_mode=self.auth_dropdown.value,
             auto_token=(self.token_field.value or "").strip() or generate_auto_token(),
             guest_write=(self.guest_dropdown.value or "write") == "write",
@@ -1187,36 +1198,36 @@ class VortexUI:
             chunk_size=self.config.chunk_size,
             direct_upload_limit=self.config.direct_upload_limit,
         )
-        if cfg.auth_mode == "manual":
-            password = self.password_field.value or ""
-            if password:
-                cfg.manual_password = password
+        if configuracion.auth_mode == "manual":
+            contrasena = self.password_field.value or ""
+            if contrasena:
+                configuracion.manual_password = contrasena
             elif self.config.password_hash:
-                cfg.password_hash = self.config.password_hash
+                configuracion.password_hash = self.config.password_hash
             else:
                 self.setup_error.value = "El modo manual requiere una contraseña"
                 self.page.update()
                 return
         try:
-            cfg.validate()
-            validate_port(cfg.port)
-        except (TypeError, ValueError) as exc:
-            suggestion = suggest_free_port(cfg.port + 1) if "uso" in str(exc) else None
-            text = str(exc)
-            if suggestion:
-                text = f"{text}. Sugerencia: {suggestion}"
-            self.setup_error.value = text
-            self._notify(text, True)
+            configuracion.validate()
+            validate_port(configuracion.port)
+        except (TypeError, ValueError) as excepcion:
+            sugerencia = suggest_free_port(configuracion.port + 1) if "uso" in str(excepcion) else None
+            texto = str(excepcion)
+            if sugerencia:
+                texto = f"{texto}. Sugerencia: {sugerencia}"
+            self.setup_error.value = texto
+            self._notify(texto, True)
             return
-        base_path = Path(cfg.base_dir).expanduser()
-        if needs_elevation(base_path):
-            self._confirm_elevation(cfg, base_path)
+        ruta_base = Path(configuracion.base_dir).expanduser()
+        if needs_elevation(ruta_base):
+            self._confirm_elevation(configuracion, ruta_base)
             return
-        self._launch(cfg)
+        self._launch(configuracion)
 
     def _confirm_elevation(self, cfg: ServerConfig, base_path: Path) -> None:
         def do_elevate(e: ft.ControlEvent) -> None:
-            self.page.close(dialog)
+            self.page.close(dialogo)
             if cfg.auth_mode == "manual" and cfg.manual_password and not cfg.password_hash:
                 from ..backend.auth import AuthManager
 
@@ -1249,7 +1260,7 @@ class VortexUI:
                 pass
             self._notify("No se pudo solicitar elevación de privilegios. Ejecuta Vortex como administrador.", True)
 
-        dialog = ft.AlertDialog(
+        dialogo = ft.AlertDialog(
             modal=True,
             title=ft.Text("Se requieren permisos de administrador", color=TEXT),
             content=ft.Text(
@@ -1259,21 +1270,21 @@ class VortexUI:
                 size=13,
             ),
             actions=[
-                ft.TextButton("Elegir otra carpeta", on_click=lambda e: self.page.close(dialog)),
+                ft.TextButton("Elegir otra carpeta", on_click=lambda e: self.page.close(dialogo)),
                 ft.ElevatedButton("Solicitar elevación", bgcolor=ACCENT_STRONG, color="#FFFFFF", on_click=do_elevate),
             ],
             actions_alignment=ft.MainAxisAlignment.END,
         )
-        self.page.open(dialog)
+        self.page.open(dialogo)
 
     def _launch(self, cfg: ServerConfig) -> None:
         try:
-            runtime = self.server.start(cfg)
-        except (ServerStartError, ValueError) as exc:
-            self._notify(str(exc), True)
+            entorno = self.server.start(cfg)
+        except (ServerStartError, ValueError) as excepcion:
+            self._notify(str(excepcion), True)
             return
-        except Exception as exc:
-            self._notify(f"No se pudo iniciar el servidor ({type(exc).__name__}): {exc}", True)
+        except Exception as excepcion:
+            self._notify(f"No se pudo iniciar el servidor ({type(excepcion).__name__}): {excepcion}", True)
             return
         self.config = cfg
         self.is_remote = False
@@ -1286,10 +1297,11 @@ class VortexUI:
         self.file_revision = 0
         self.file_sync_checked_at = 0.0
         self.log_buffer.clear()
-        self.log_unsubscribe = runtime.audit.add_listener(self._audit_listener)
+        self.log_unsubscribe = entorno.audit.add_listener(self._audit_listener)
         self._start_polling()
         self._enter_app()
 
+    # Sincronización periódica de cambios y estado del servidor.
     def _start_polling(self) -> None:
         if self.poll_started:
             return
@@ -1306,9 +1318,9 @@ class VortexUI:
                 self._refresh_upload_widget()
                 await self._sync_file_changes()
                 if self.remote_download_notice is not None:
-                    message, is_error = self.remote_download_notice
+                    mensaje, es_error = self.remote_download_notice
                     self.remote_download_notice = None
-                    self._notify(message, is_error)
+                    self._notify(mensaje, es_error)
                 if self.logs_dialog_open:
                     self._refresh_logs()
             except Exception:
@@ -1320,7 +1332,7 @@ class VortexUI:
             return
         self.file_sync_checked_at = time.monotonic()
         try:
-            response = await asyncio.to_thread(
+            respuesta = await asyncio.to_thread(
                 self.http.get,
                 "/api/system/changes",
                 params={"since": self.file_revision},
@@ -1329,34 +1341,35 @@ class VortexUI:
             )
         except httpx.HTTPError:
             return
-        if response.status_code != 200:
+        if respuesta.status_code != 200:
             return
         try:
-            data = response.json()
+            datos = respuesta.json()
         except ValueError:
             return
-        changes = data.get("changes") or []
-        self.file_revision = int(data.get("revision", self.file_revision))
-        if not changes:
+        cambios = datos.get("changes") or []
+        self.file_revision = int(datos.get("revision", self.file_revision))
+        if not cambios:
             return
-        path = self.current_path
-        refresh = False
-        for change in changes:
-            removed = change.get("removed")
-            if removed and (path == removed or path.startswith(removed + "/")):
-                path = removed.rpartition("/")[0]
-                refresh = True
-            renamed = change.get("renamed")
-            if renamed:
-                old = renamed.get("from", "")
-                if old and (path == old or path.startswith(old + "/")):
-                    path = renamed.get("to", "") + path[len(old):]
-                    refresh = True
-            if path in (change.get("paths") or []):
-                refresh = True
-        if refresh:
-            self.refresh_listing(path)
+        ruta = self.current_path
+        refrescar = False
+        for cambio in cambios:
+            eliminados = cambio.get("removed")
+            if eliminados and (ruta == eliminados or ruta.startswith(eliminados + "/")):
+                ruta = eliminados.rpartition("/")[0]
+                refrescar = True
+            renombrado = cambio.get("renamed")
+            if renombrado:
+                anterior = renombrado.get("from", "")
+                if anterior and (ruta == anterior or ruta.startswith(anterior + "/")):
+                    ruta = renombrado.get("to", "") + ruta[len(anterior):]
+                    refrescar = True
+            if ruta in (cambio.get("paths") or []):
+                refrescar = True
+        if refrescar:
+            self.refresh_listing(ruta)
 
+    # Sesión local: login automático o pantalla de acceso.
     def _enter_app(self) -> None:
         if self._auto_login():
             self.show_browser()
@@ -1366,76 +1379,77 @@ class VortexUI:
     def _auto_login(self) -> bool:
         if self.config.auth_mode == "none":
             try:
-                response = httpx.get(f"{self.base_url}/api/auth/me", timeout=10)
+                respuesta = httpx.get(f"{self.base_url}/api/auth/me", timeout=10)
             except httpx.HTTPError:
                 return False
-            if response.status_code == 200:
-                self.role = response.json().get("role")
+            if respuesta.status_code == 200:
+                self.role = respuesta.json().get("role")
                 self.token = None
                 return True
             return False
-        secret = None
+        secreto = None
         if self.config.auth_mode == "auto":
-            secret = self.config.auto_token
+            secreto = self.config.auto_token
         elif self.config.auth_mode == "manual" and self.config.manual_password:
-            secret = self.config.manual_password
-        if not secret:
+            secreto = self.config.manual_password
+        if not secreto:
             return False
-        return self._post_login(secret)
+        return self._post_login(secreto)
 
     def _post_login(self, secret: str) -> bool:
         if self.http is None:
             return False
         try:
-            response = self.http.post("/api/auth/login", json={"secret": secret}, timeout=20)
+            respuesta = self.http.post("/api/auth/login", json={"secret": secret}, timeout=20)
         except httpx.HTTPError:
             return False
-        if response.status_code != 200:
+        if respuesta.status_code != 200:
             return False
-        data = response.json()
-        self.token = data.get("access_token")
-        self.role = data.get("role")
+        datos = respuesta.json()
+        self.token = datos.get("access_token")
+        self.role = datos.get("role")
         if self.http is not None:
             self.http.headers["Authorization"] = f"Bearer {self.token}"
         return True
 
+    # Pantalla de acceso con contraseña o entrada como invitado.
     def show_login(self, error: str = "") -> None:
-        credential_label = "Token o contraseña del servidor" if self.is_remote else "Contraseña de administrador"
-        password = self._field(credential_label, password=True, can_reveal_password=True, autofocus=True)
-        error_text = ft.Text(error, color=DANGER, size=12)
-        busy = ft.ProgressRing(width=18, height=18, visible=False, color=ACCENT)
+        etiqueta_credencial = "Token o contraseña del servidor" if self.is_remote else "Contraseña de administrador"
+        contrasena = self._field(etiqueta_credencial, password=True, can_reveal_password=True, autofocus=True)
+        texto_error = ft.Text(error, color=DANGER, size=12)
+        ocupado = ft.ProgressRing(width=18, height=18, visible=False, color=ACCENT)
 
         def attempt(e: ft.ControlEvent) -> None:
-            if not password.value:
-                error_text.value = "Introduce la contraseña"
+            if not contrasena.value:
+                texto_error.value = "Introduce la contraseña"
                 self.page.update()
                 return
-            busy.visible = True
-            error_text.value = ""
+            ocupado.visible = True
+            texto_error.value = ""
             self.page.update()
-            ok = self._post_login(password.value)
-            busy.visible = False
-            if ok:
+            correcto = self._post_login(contrasena.value)
+            ocupado.visible = False
+            if correcto:
                 self.show_browser()
             else:
-                error_text.value = "Credenciales inválidas o bloqueo temporal por intentos fallidos"
+                texto_error.value = "Credenciales inválidas o bloqueo temporal por intentos fallidos"
                 self.page.update()
 
         def continue_as_guest(e: ft.ControlEvent | None = None) -> None:
             self.token = None
-            guest_write = self.remote_guest_write if self.is_remote else self.config.guest_write
-            self.role = "guest_write" if guest_write else "guest_read"
+            escritura_invitado = self.remote_guest_write if self.is_remote else self.config.guest_write
+            self.role = "guest_write" if escritura_invitado else "guest_read"
             if self.http is not None:
                 self.http.headers.pop("Authorization", None)
             self.show_browser()
 
-        password.on_submit = attempt
-        secondary_action = (
+        contrasena.on_submit = attempt
+        accion_secundaria = (
             ft.TextButton("Cancelar", on_click=self._cancel_remote_login)
             if self.is_remote and self.remote_requires_login
             else ft.OutlinedButton("Continuar como invitado", on_click=continue_as_guest)
         )
-        card = self._card(
+        tarjeta = self._card(
             ft.Column(
                 [
                     ft.Container(
@@ -1453,12 +1467,12 @@ class VortexUI:
                         size=12,
                         color=MUTED,
                     ),
-                    password,
-                    error_text,
+                    contrasena,
+                    texto_error,
                     ft.Row(
                         [
-                            secondary_action,
-                            busy,
+                            accion_secundaria,
+                            ocupado,
                             ft.Container(expand=True),
                             ft.ElevatedButton("Entrar", icon=ft.icons.LOGIN, bgcolor=ACCENT_STRONG, color="#FFFFFF", on_click=attempt),
                         ],
@@ -1474,7 +1488,7 @@ class VortexUI:
                 expand=True,
                 bgcolor=BG,
                 alignment=ft.alignment.center,
-                content=ft.Column([card], alignment=ft.MainAxisAlignment.CENTER, horizontal_alignment=ft.CrossAxisAlignment.CENTER),
+                content=ft.Column([tarjeta], alignment=ft.MainAxisAlignment.CENTER, horizontal_alignment=ft.CrossAxisAlignment.CENTER),
             )
         )
 
@@ -1488,36 +1502,38 @@ class VortexUI:
             return {"Authorization": f"Bearer {self.token}"}
         return {}
 
+    # Peticiones HTTP comunes con cabeceras de autenticación.
     def _request(self, method: str, url: str, **kwargs):
         if self.http is None:
             return None
-        headers = dict(self._auth_headers())
-        headers.update(kwargs.pop("headers", {}) or {})
+        cabeceras = dict(self._auth_headers())
+        cabeceras.update(kwargs.pop("headers", {}) or {})
         try:
-            response = self.http.request(method, url, headers=headers, **kwargs)
-        except httpx.HTTPError as exc:
-            self._notify(f"Error de conexión: {exc}", True)
+            respuesta = self.http.request(method, url, headers=cabeceras, **kwargs)
+        except httpx.HTTPError as excepcion:
+            self._notify(f"Error de conexión: {excepcion}", True)
             return None
-        if response.status_code == 401:
+        if respuesta.status_code == 401:
             self.token = None
             self.show_login("La sesión expiró. Vuelve a iniciar sesión.")
             return None
-        if response.status_code >= 400:
-            detail = response.text
+        if respuesta.status_code >= 400:
+            detalle = respuesta.text
             try:
-                payload = response.json()
-                detail = payload.get("detail", detail)
-                if isinstance(detail, dict):
-                    detail = detail.get("message", str(detail))
+                carga = respuesta.json()
+                detalle = carga.get("detail", detalle)
+                if isinstance(detalle, dict):
+                    detalle = detalle.get("message", str(detalle))
             except Exception:
                 pass
-            self._notify(str(detail), True)
+            self._notify(str(detalle), True)
             return None
         try:
-            return response.json()
+            return respuesta.json()
         except ValueError:
             return None
 
+    # Navegador de archivos: cabecera, listado y acciones.
     def show_browser(self) -> None:
         self.search_field = ft.TextField(
             hint_text="Buscar o comando…   Ctrl+K",
@@ -1538,13 +1554,13 @@ class VortexUI:
         self.count_text = ft.Text("", size=11, color=MUTED)
         self.listing = ft.ListView(expand=True, spacing=2, padding=ft.padding.symmetric(vertical=10), controls=[])
 
-        badge_color = SUCCESS if self.role == "host" else ACCENT
-        role_label = {"host": "HOST", "guest_write": "INVITADO · TOTAL", "guest_read": "INVITADO · LECTURA"}.get(self.role or "", "INVITADO")
+        color_insignia = SUCCESS if self.role == "host" else ACCENT
+        etiqueta_rol = {"host": "HOST", "guest_write": "INVITADO · TOTAL", "guest_read": "INVITADO · LECTURA"}.get(self.role or "", "INVITADO")
         if self.is_remote and self.role == "host":
-            role_label = "HOST REMOTO"
-        header_actions: list[ft.Control] = []
+            etiqueta_rol = "HOST REMOTO"
+        acciones_cabecera: list[ft.Control] = []
         if not self.is_desktop:
-            header_actions.append(
+            acciones_cabecera.append(
                 ft.IconButton(
                     icon=ft.icons.PALETTE,
                     icon_color=ACCENT,
@@ -1554,7 +1570,7 @@ class VortexUI:
             )
         if self.is_remote:
             if self.remote_auth_mode != "none" and self.role != "host":
-                header_actions.append(
+                acciones_cabecera.append(
                     ft.IconButton(
                         icon=ft.icons.LOGIN,
                         icon_color=ACCENT,
@@ -1562,7 +1578,7 @@ class VortexUI:
                         on_click=lambda ev: self.show_login(),
                     )
                 )
-            header_actions.append(
+            acciones_cabecera.append(
                 ft.IconButton(
                     icon=ft.icons.LINK_OFF,
                     icon_color=DANGER,
@@ -1572,7 +1588,7 @@ class VortexUI:
             )
         else:
             if self.config.auth_mode != "none" and self.role != "host":
-                header_actions.append(
+                acciones_cabecera.append(
                     ft.IconButton(
                         icon=ft.icons.LOGIN,
                         icon_color=ACCENT,
@@ -1580,14 +1596,14 @@ class VortexUI:
                         on_click=lambda e: self.show_login(),
                     )
                 )
-            header_actions.extend(
+            acciones_cabecera.extend(
                 [
                     ft.TextButton(text="Acceso LAN", icon=ft.icons.WIFI_TETHERING, tooltip="Cómo entrar desde la red local", on_click=self._show_lan_help),
                     ft.IconButton(icon=ft.icons.TERMINAL, icon_color=MUTED, tooltip="Consola de logs (host)", on_click=self._open_logs),
                     ft.IconButton(icon=ft.icons.POWER_SETTINGS_NEW, icon_color=DANGER, tooltip="Detener servidor", on_click=self._stop_server),
                 ]
             )
-        header = ft.Container(
+        cabecera = ft.Container(
             bgcolor=SURFACE,
             border=ft.border.only(bottom=ft.BorderSide(1, BORDER)),
             padding=ft.padding.symmetric(horizontal=22, vertical=12),
@@ -1600,22 +1616,22 @@ class VortexUI:
                         border=ft.border.all(1, BORDER),
                         content=ft.Row(
                             [
-                                ft.Container(width=7, height=7, border_radius=4, bgcolor=badge_color),
-                                ft.Text(role_label, size=10, color=badge_color, weight=ft.FontWeight.W_600),
+                                ft.Container(width=7, height=7, border_radius=4, bgcolor=color_insignia),
+                                ft.Text(etiqueta_rol, size=10, color=color_insignia, weight=ft.FontWeight.W_600),
                             ],
                             spacing=5,
                         ),
                     ),
                     ft.Container(expand=True),
                     self.search_field,
-                    *header_actions,
+                    *acciones_cabecera,
                 ],
                 spacing=12,
                 vertical_alignment=ft.CrossAxisAlignment.CENTER,
             ),
         )
 
-        toolbar = ft.Container(
+        barra_herramientas = ft.Container(
             padding=ft.padding.symmetric(horizontal=22, vertical=8),
             content=ft.Row(
                 [
@@ -1674,23 +1690,23 @@ class VortexUI:
             ),
         )
 
-        body = ft.Container(expand=True, padding=ft.padding.symmetric(horizontal=18), content=self.listing)
-        column = ft.Column([header, toolbar, body], expand=True, spacing=0)
-        stack = ft.Stack([ft.Container(expand=True, content=column), self.upload_widget], expand=True)
-        self._set_root(stack)
+        cuerpo = ft.Container(expand=True, padding=ft.padding.symmetric(horizontal=18), content=self.listing)
+        columna = ft.Column([cabecera, barra_herramientas, cuerpo], expand=True, spacing=0)
+        pila = ft.Stack([ft.Container(expand=True, content=columna), self.upload_widget], expand=True)
+        self._set_root(pila)
         self.refresh_listing(self.current_path)
 
     def _show_lan_help(self, e: ft.ControlEvent | None = None) -> None:
-        port = self.config.port
-        hostname = self.config.hostname.rstrip(".")
-        address = local_ip()
-        ip_url = f"http://{address}:{port}"
-        named_url = f"http://{hostname}:{port}"
-        qr_image = qrcode.make(ip_url)
-        qr_buffer = io.BytesIO()
-        qr_image.save(qr_buffer)
-        qr_base64 = base64.b64encode(qr_buffer.getvalue()).decode("ascii")
-        dialog = ft.AlertDialog(
+        puerto = self.config.port
+        nombre_host = self.config.hostname.rstrip(".")
+        direccion = local_ip()
+        url_ip = f"http://{direccion}:{puerto}"
+        url_nombrada = f"http://{nombre_host}:{puerto}"
+        imagen_qr = qrcode.make(url_ip)
+        buffer_qr = io.BytesIO()
+        imagen_qr.save(buffer_qr)
+        qr_base64 = base64.b64encode(buffer_qr.getvalue()).decode("ascii")
+        dialogo = ft.AlertDialog(
             modal=True,
             title=ft.Row(
                 [
@@ -1727,10 +1743,10 @@ class VortexUI:
                                         [
                                             ft.Text("Escanea para conectarte", color=ACCENT, size=14, weight=ft.FontWeight.W_600),
                                             ft.Text("IP del entorno donde corre Vortex", color=MUTED, size=11),
-                                            ft.Text(ip_url, color=TEXT, size=14, selectable=True, font_family="monospace"),
+                                            ft.Text(url_ip, color=TEXT, size=14, selectable=True, font_family="monospace"),
                                             ft.Divider(color=BORDER, height=8),
                                             ft.Text("Nombre mDNS (puede no funcionar en ChromeOS)", color=MUTED, size=11),
-                                            ft.Text(named_url, color=MUTED, size=12, selectable=True, font_family="monospace"),
+                                            ft.Text(url_nombrada, color=MUTED, size=12, selectable=True, font_family="monospace"),
                                         ],
                                         spacing=6,
                                     ),
@@ -1742,7 +1758,7 @@ class VortexUI:
                         ft.Text(
                             "Los invitados tienen control total sin iniciar sesión. Si Vortex corre en el Linux "
                             "de un Chromebook, esta IP puede ser solo del contenedor: habilita el reenvío "
-                            f"TCP del puerto {port} en Configuración > Desarrolladores > Linux > Reenvío "
+                            f"TCP del puerto {puerto} en Configuración > Desarrolladores > Linux > Reenvío "
                             "de puertos y, desde el otro dispositivo, usa la IP Wi-Fi del Chromebook.",
                             color=MUTED,
                             size=12,
@@ -1753,60 +1769,60 @@ class VortexUI:
                 ),
             ),
             actions=[
-                ft.TextButton("Cerrar", on_click=lambda ev: self.page.close(dialog)),
+                ft.TextButton("Cerrar", on_click=lambda ev: self.page.close(dialogo)),
                 ft.ElevatedButton(
                     "Abrir IP aquí",
                     icon=ft.icons.OPEN_IN_BROWSER,
                     bgcolor=ACCENT_STRONG,
                     color="#FFFFFF",
-                    on_click=lambda ev: (self.page.close(dialog), self._open_url(ip_url)),
+                    on_click=lambda ev: (self.page.close(dialogo), self._open_url(url_ip)),
                 ),
             ],
             actions_alignment=ft.MainAxisAlignment.END,
         )
-        self.page.open(dialog)
+        self.page.open(dialogo)
 
     def _on_search_submit(self, e: ft.ControlEvent) -> None:
-        query = (self.search_field.value or "").strip()
-        if not query:
+        consulta = (self.search_field.value or "").strip()
+        if not consulta:
             self.refresh_listing(self.current_path)
             return
-        data = self._request("GET", "/api/files/search", params={"path": self.current_path, "q": query, "limit": 300})
-        if data is None:
+        datos = self._request("GET", "/api/files/search", params={"path": self.current_path, "q": consulta, "limit": 300})
+        if datos is None:
             return
-        self._render_items(data["items"])
-        suffix = " · resultados truncados" if data.get("truncated") else ""
-        self.count_text.value = f"{data['total']} coincidencias{suffix}"
+        self._render_items(datos["items"])
+        sufijo = " · resultados truncados" if datos.get("truncated") else ""
+        self.count_text.value = f"{datos['total']} coincidencias{sufijo}"
         self.page.update()
 
     def refresh_listing(self, path: str) -> None:
-        data = self._request("GET", "/api/files", params={"path": path})
-        if data is None:
+        datos = self._request("GET", "/api/files", params={"path": path})
+        if datos is None:
             return
-        self.current_path = data["path"]
-        self.parent_path = data["parent"]
-        self._render_items(data["items"])
-        self.count_text.value = f"{data['total']} elementos"
+        self.current_path = datos["path"]
+        self.parent_path = datos["parent"]
+        self._render_items(datos["items"])
+        self.count_text.value = f"{datos['total']} elementos"
         self._build_breadcrumb(self.current_path)
         self.page.update()
 
     def _build_breadcrumb(self, path: str) -> None:
         self.breadcrumb.controls.clear()
-        root_button = ft.TextButton(
+        boton_raiz = ft.TextButton(
             text="Raíz",
             icon=ft.icons.HOME_ROUNDED,
             on_click=lambda e: self.refresh_listing(""),
         )
-        self.breadcrumb.controls.append(root_button)
+        self.breadcrumb.controls.append(boton_raiz)
         if not path:
             return
-        accumulated = []
-        for part in path.split("/"):
-            accumulated.append(part)
-            target = "/".join(accumulated)
+        acumulado = []
+        for parte in path.split("/"):
+            acumulado.append(parte)
+            objetivo = "/".join(acumulado)
             self.breadcrumb.controls.append(ft.Text("/", size=12, color=MUTED))
             self.breadcrumb.controls.append(
-                ft.TextButton(text=part, on_click=lambda e, t=target: self.refresh_listing(t))
+                ft.TextButton(text=parte, on_click=lambda e, t=objetivo: self.refresh_listing(t))
             )
 
     def _render_items(self, items: list[dict]) -> None:
@@ -1830,54 +1846,54 @@ class VortexUI:
                 )
             )
             return
-        for item in items:
-            self.listing.controls.append(self._build_row(item))
+        for elemento in items:
+            self.listing.controls.append(self._build_row(elemento))
 
     def _build_row(self, item: dict) -> ft.Container:
-        kind = item["kind"]
-        subtitle = "Carpeta" if item["is_dir"] else human_size(item["size"])
-        subtitle += f"  ·  {format_time(item['modified'])}"
-        actions = []
+        tipo = item["kind"]
+        subtitulo = "Carpeta" if item["is_dir"] else human_size(item["size"])
+        subtitulo += f"  ·  {format_time(item['modified'])}"
+        acciones = []
         if item["is_dir"]:
-            actions.append(ft.IconButton(icon=ft.icons.ARCHIVE, icon_size=18, icon_color=MUTED, tooltip="Descargar .zip", on_click=lambda e, it=item: self._open_url(self._zip_url(it["path"]))))
+            acciones.append(ft.IconButton(icon=ft.icons.ARCHIVE, icon_size=18, icon_color=MUTED, tooltip="Descargar .zip", on_click=lambda e, it=item: self._open_url(self._zip_url(it["path"]))))
         else:
-            actions.append(ft.IconButton(icon=ft.icons.DOWNLOAD, icon_size=18, icon_color=MUTED, tooltip="Descargar", on_click=lambda e, it=item: self._open_url(self._file_url(it["path"]))))
+            acciones.append(ft.IconButton(icon=ft.icons.DOWNLOAD, icon_size=18, icon_color=MUTED, tooltip="Descargar", on_click=lambda e, it=item: self._open_url(self._file_url(it["path"]))))
         if item.get("editable") and not item["is_dir"]:
-            actions.append(ft.IconButton(icon=ft.icons.EDIT_OUTLINED, icon_size=18, icon_color=ACCENT, tooltip="Editar", on_click=lambda e, it=item: self.show_editor(it)))
-        actions.append(ft.IconButton(icon=ft.icons.EDIT_NOTE, icon_size=18, icon_color=MUTED, tooltip="Renombrar", on_click=lambda e, it=item: self.show_rename(it)))
-        actions.append(ft.IconButton(icon=ft.icons.DELETE_OUTLINE, icon_size=18, icon_color=DANGER, tooltip="Eliminar", on_click=lambda e, it=item: self.confirm_delete(it)))
-        icon = ft.Container(
+            acciones.append(ft.IconButton(icon=ft.icons.EDIT_OUTLINED, icon_size=18, icon_color=ACCENT, tooltip="Editar", on_click=lambda e, it=item: self.show_editor(it)))
+        acciones.append(ft.IconButton(icon=ft.icons.EDIT_NOTE, icon_size=18, icon_color=MUTED, tooltip="Renombrar", on_click=lambda e, it=item: self.show_rename(it)))
+        acciones.append(ft.IconButton(icon=ft.icons.DELETE_OUTLINE, icon_size=18, icon_color=DANGER, tooltip="Eliminar", on_click=lambda e, it=item: self.confirm_delete(it)))
+        icono = ft.Container(
             width=38,
             height=38,
             border_radius=10,
             bgcolor=SURFACE,
             alignment=ft.alignment.center,
-            content=ft.Icon(name=icon_for_kind(kind), color=color_for_kind(kind), size=20),
+            content=ft.Icon(name=icon_for_kind(tipo), color=color_for_kind(tipo), size=20),
         )
-        details = ft.Column(
+        detalles = ft.Column(
             [
                 ft.Text(item["name"], size=14, color=TEXT, weight=ft.FontWeight.W_500, overflow=ft.TextOverflow.ELLIPSIS, max_lines=1),
-                ft.Text(subtitle, size=11, color=MUTED),
+                ft.Text(subtitulo, size=11, color=MUTED),
             ],
             spacing=1,
             expand=True,
         )
-        open_target = lambda e, it=item: self.open_item(it)
-        main = ft.Container(
+        objetivo_apertura = lambda e, it=item: self.open_item(it)
+        principal = ft.Container(
             expand=True,
-            on_click=open_target,
-            content=ft.Row([icon, details], spacing=12, vertical_alignment=ft.CrossAxisAlignment.CENTER),
+            on_click=objetivo_apertura,
+            content=ft.Row([icono, detalles], spacing=12, vertical_alignment=ft.CrossAxisAlignment.CENTER),
         )
-        row = ft.Row(
+        fila = ft.Row(
             [
-                main,
-                ft.Row(actions, spacing=0),
+                principal,
+                ft.Row(acciones, spacing=0),
             ],
             vertical_alignment=ft.CrossAxisAlignment.CENTER,
             spacing=0,
         )
         return ft.Container(
-            content=row,
+            content=fila,
             padding=ft.padding.symmetric(horizontal=10, vertical=7),
             border_radius=10,
             on_hover=self._hover_row,
@@ -1901,18 +1917,18 @@ class VortexUI:
             self.refresh_listing(self.parent_path)
 
     def _file_url(self, path: str, inline: bool = False) -> str:
-        params = {"path": path}
+        parametros = {"path": path}
         if inline:
-            params["inline"] = "1"
+            parametros["inline"] = "1"
         if self.token:
-            params["token"] = self.token
-        return f"{self.base_url}/api/files/download?{urlencode(params)}"
+            parametros["token"] = self.token
+        return f"{self.base_url}/api/files/download?{urlencode(parametros)}"
 
     def _zip_url(self, path: str) -> str:
-        params = {"path": path}
+        parametros = {"path": path}
         if self.token:
-            params["token"] = self.token
-        return f"{self.base_url}/api/files/zip?{urlencode(params)}"
+            parametros["token"] = self.token
+        return f"{self.base_url}/api/files/zip?{urlencode(parametros)}"
 
     def _open_url(self, url: str) -> None:
         if self.is_remote:
@@ -1920,56 +1936,57 @@ class VortexUI:
             return
         try:
             webbrowser.open(url)
-        except Exception as exc:
-            self._notify(f"No se pudo abrir el navegador: {exc}", True)
+        except Exception as excepcion:
+            self._notify(f"No se pudo abrir el navegador: {excepcion}", True)
 
     def _download_remote_url(self, url: str) -> None:
         if self.http is None:
             self.remote_download_notice = ("La conexión con el servidor se cerró", True)
             return
         try:
-            with self.http.stream("GET", url, headers=self._auth_headers(), timeout=None) as response:
-                response.raise_for_status()
-                disposition = Message()
-                if response.headers.get("content-disposition"):
-                    disposition["content-disposition"] = response.headers["content-disposition"]
-                filename = disposition.get_filename()
-                if not filename:
-                    query = parse_qs(urlsplit(url).query)
-                    file_path = query.get("path", [""])[0]
-                    filename = Path(unquote(file_path)).name or "descarga"
-                    if "/zip" in url and not filename.endswith(".zip"):
-                        filename += ".zip"
-                filename = Path(filename).name.replace("\x00", "") or "descarga"
-                download_dir = Path.home() / "Downloads"
-                download_dir.mkdir(parents=True, exist_ok=True)
-                destination = download_dir / filename
-                index = 1
-                while destination.exists():
-                    destination = download_dir / f"{Path(filename).stem}_{index}{Path(filename).suffix}"
-                    index += 1
-                temporary = destination.with_name(destination.name + ".part")
-                with temporary.open("wb") as output:
-                    for chunk in response.iter_bytes():
-                        output.write(chunk)
-                temporary.replace(destination)
-            self.remote_download_notice = (f"Guardado en {destination}", False)
-        except Exception as exc:
-            self.remote_download_notice = (f"No se pudo descargar el archivo: {exc}", True)
+            with self.http.stream("GET", url, headers=self._auth_headers(), timeout=None) as respuesta:
+                respuesta.raise_for_status()
+                disposicion = Message()
+                if respuesta.headers.get("content-disposition"):
+                    disposicion["content-disposition"] = respuesta.headers["content-disposition"]
+                nombre_archivo = disposicion.get_filename()
+                if not nombre_archivo:
+                    consulta = parse_qs(urlsplit(url).query)
+                    ruta_archivo = consulta.get("path", [""])[0]
+                    nombre_archivo = Path(unquote(ruta_archivo)).name or "descarga"
+                    if "/zip" in url and not nombre_archivo.endswith(".zip"):
+                        nombre_archivo += ".zip"
+                nombre_archivo = Path(nombre_archivo).name.replace("\x00", "") or "descarga"
+                directorio_descarga = Path.home() / "Downloads"
+                directorio_descarga.mkdir(parents=True, exist_ok=True)
+                destino = directorio_descarga / nombre_archivo
+                indice = 1
+                while destino.exists():
+                    destino = directorio_descarga / f"{Path(nombre_archivo).stem}_{indice}{Path(nombre_archivo).suffix}"
+                    indice += 1
+                temporal = destino.with_name(destino.name + ".part")
+                with temporal.open("wb") as salida:
+                    for bloque in respuesta.iter_bytes():
+                        salida.write(bloque)
+                temporal.replace(destino)
+            self.remote_download_notice = (f"Guardado en {destino}", False)
+        except Exception as excepcion:
+            self.remote_download_notice = (f"No se pudo descargar el archivo: {excepcion}", True)
 
+    # Vista previa de imágenes, texto, audio y vídeo.
     def show_preview(self, item: dict) -> None:
-        kind = item["kind"]
-        content: ft.Control
-        if kind == "image":
-            content = ft.Container(
+        tipo = item["kind"]
+        contenido: ft.Control
+        if tipo == "image":
+            contenido = ft.Container(
                 height=460,
                 alignment=ft.alignment.center,
                 content=ft.Image(src=self._file_url(item["path"], inline=True), fit=ft.ImageFit.CONTAIN, border_radius=8),
             )
-        elif kind in {"video", "audio"}:
-            content = ft.Column(
+        elif tipo in {"video", "audio"}:
+            contenido = ft.Column(
                 [
-                    ft.Icon(name="movie" if kind == "video" else "audiotrack", color=ACCENT, size=54),
+                    ft.Icon(name="movie" if tipo == "video" else "audiotrack", color=ACCENT, size=54),
                     ft.Text(
                         "Guarda el archivo para reproducirlo en este equipo."
                         if self.is_remote
@@ -1988,8 +2005,8 @@ class VortexUI:
                 horizontal_alignment=ft.CrossAxisAlignment.CENTER,
                 spacing=12,
             )
-        elif kind == "pdf":
-            content = ft.Column(
+        elif tipo == "pdf":
+            contenido = ft.Column(
                 [
                     ft.Icon(name=ft.icons.PICTURE_AS_PDF, color=DANGER, size=54),
                     ft.ElevatedButton(
@@ -2003,49 +2020,50 @@ class VortexUI:
                 horizontal_alignment=ft.CrossAxisAlignment.CENTER,
                 spacing=12,
             )
-        elif kind in {"text", "code"} or item.get("editable"):
-            data = self._request("GET", "/api/files/read", params={"path": item["path"]})
-            text = data["content"] if data else "(No se pudo cargar la vista previa)"
-            content = ft.Container(
+        elif tipo in {"text", "code"} or item.get("editable"):
+            datos = self._request("GET", "/api/files/read", params={"path": item["path"]})
+            texto = datos["content"] if datos else "(No se pudo cargar la vista previa)"
+            contenido = ft.Container(
                 height=460,
                 border_radius=8,
                 bgcolor=SURFACE_ALT,
                 padding=14,
                 content=ft.Column(
-                    [ft.Text(text[:200000], size=12, color=TEXT, selectable=True, font_family="monospace")],
+                    [ft.Text(texto[:200000], size=12, color=TEXT, selectable=True, font_family="monospace")],
                     scroll=ft.ScrollMode.AUTO,
                 ),
             )
         else:
-            content = ft.Column(
+            contenido = ft.Column(
                 [
-                    ft.Icon(name=icon_for_kind(kind), color=MUTED, size=54),
+                    ft.Icon(name=icon_for_kind(tipo), color=MUTED, size=54),
                     ft.Text("Vista previa no disponible para este formato.", size=12, color=MUTED),
                 ],
                 horizontal_alignment=ft.CrossAxisAlignment.CENTER,
                 spacing=12,
             )
-        actions = [
-            ft.TextButton("Cerrar", on_click=lambda e: self.page.close(dialog)),
+        acciones = [
+            ft.TextButton("Cerrar", on_click=lambda e: self.page.close(dialogo)),
             ft.ElevatedButton("Descargar", icon=ft.icons.DOWNLOAD, bgcolor=ACCENT_STRONG, color="#FFFFFF", on_click=lambda e: self._open_url(self._file_url(item["path"]))),
         ]
         if item.get("editable") and not item["is_dir"]:
-            actions.insert(0, ft.OutlinedButton("Editar", icon=ft.icons.EDIT, on_click=lambda e: (self.page.close(dialog), self.show_editor(item))))
-        dialog = ft.AlertDialog(
+            acciones.insert(0, ft.OutlinedButton("Editar", icon=ft.icons.EDIT, on_click=lambda e: (self.page.close(dialogo), self.show_editor(item))))
+        dialogo = ft.AlertDialog(
             modal=False,
             title=ft.Text(item["name"], color=TEXT, size=16),
-            content=ft.Container(width=760, content=content),
-            actions=actions,
+            content=ft.Container(width=760, content=contenido),
+            actions=acciones,
             actions_alignment=ft.MainAxisAlignment.END,
         )
-        self.page.open(dialog)
+        self.page.open(dialogo)
 
+    # Editor de texto con guardado y versiones anteriores.
     def show_editor(self, item: dict) -> None:
-        data = self._request("GET", "/api/files/read", params={"path": item["path"]})
-        if data is None:
+        datos = self._request("GET", "/api/files/read", params={"path": item["path"]})
+        if datos is None:
             return
         editor = ft.TextField(
-            value=data["content"],
+            value=datos["content"],
             multiline=True,
             min_lines=18,
             max_lines=26,
@@ -2060,13 +2078,13 @@ class VortexUI:
         )
 
         def save(e: ft.ControlEvent) -> None:
-            result = self._request("PUT", "/api/files/write", json={"path": item["path"], "content": editor.value or ""})
-            if result is not None:
-                self.page.close(dialog)
+            resultado = self._request("PUT", "/api/files/write", json={"path": item["path"], "content": editor.value or ""})
+            if resultado is not None:
+                self.page.close(dialogo)
                 self._notify("Archivo guardado")
                 self.refresh_listing(self.current_path)
 
-        dialog = ft.AlertDialog(
+        dialogo = ft.AlertDialog(
             modal=False,
             title=ft.Text(f"Editar · {item['name']}", color=TEXT, size=16),
             content=ft.Container(width=780, content=editor),
@@ -2074,45 +2092,45 @@ class VortexUI:
                 ft.TextButton(
                     "Historial",
                     icon=ft.icons.HISTORY,
-                    on_click=lambda e: self._show_file_versions(item, dialog),
+                    on_click=lambda e: self._show_file_versions(item, dialogo),
                 ),
-                ft.TextButton("Cancelar", on_click=lambda e: self.page.close(dialog)),
+                ft.TextButton("Cancelar", on_click=lambda e: self.page.close(dialogo)),
                 ft.ElevatedButton("Guardar", icon=ft.icons.SAVE, bgcolor=SUCCESS, color="#FFFFFF", on_click=save),
             ],
             actions_alignment=ft.MainAxisAlignment.END,
         )
-        self.page.open(dialog)
+        self.page.open(dialogo)
 
     def _show_file_versions(self, item: dict, editor_dialog: ft.AlertDialog) -> None:
-        data = self._request("GET", "/api/files/versions", params={"path": item["path"]})
-        if data is None:
+        datos = self._request("GET", "/api/files/versions", params={"path": item["path"]})
+        if datos is None:
             return
-        versions = data.get("versions", [])
-        rows: list[ft.Control] = []
+        versiones = datos.get("versions", [])
+        filas: list[ft.Control] = []
 
         def delete_one(version_id: str) -> None:
-            result = self._request(
+            resultado = self._request(
                 "DELETE",
                 f"/api/files/versions/{version_id}",
                 params={"path": item["path"]},
             )
-            if result is not None:
-                self.page.close(history_dialog)
+            if resultado is not None:
+                self.page.close(dialogo_historial)
                 self._notify("Versión eliminada")
                 self._show_file_versions(item, editor_dialog)
 
         def clear_all(e: ft.ControlEvent) -> None:
             def confirm(ev: ft.ControlEvent) -> None:
-                result = self._request(
+                resultado = self._request(
                     "DELETE", "/api/files/versions", params={"path": item["path"]}
                 )
-                self.page.close(confirm_dialog)
-                if result is not None:
-                    self.page.close(history_dialog)
+                self.page.close(dialogo_confirmacion)
+                if resultado is not None:
+                    self.page.close(dialogo_historial)
                     self._notify("Historial eliminado")
                     self._show_file_versions(item, editor_dialog)
 
-            confirm_dialog = ft.AlertDialog(
+            dialogo_confirmacion = ft.AlertDialog(
                 modal=True,
                 title=ft.Text("Borrar todo el historial", color=TEXT),
                 content=ft.Text(
@@ -2121,22 +2139,22 @@ class VortexUI:
                     size=13,
                 ),
                 actions=[
-                    ft.TextButton("Cancelar", on_click=lambda ev: self.page.close(confirm_dialog)),
+                    ft.TextButton("Cancelar", on_click=lambda ev: self.page.close(dialogo_confirmacion)),
                     ft.ElevatedButton("Borrar todo", icon=ft.icons.DELETE_OUTLINE, bgcolor=DANGER, color="#FFFFFF", on_click=confirm),
                 ],
             )
-            self.page.open(confirm_dialog)
+            self.page.open(dialogo_confirmacion)
 
-        if not versions:
-            rows.append(ft.Text("Todavía no hay versiones guardadas.", color=MUTED, size=12))
-        for version in versions:
-            stamp = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(version["created"]))
-            rows.append(
+        if not versiones:
+            filas.append(ft.Text("Todavía no hay versiones guardadas.", color=MUTED, size=12))
+        for version in versiones:
+            marca = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(version["created"]))
+            filas.append(
                 ft.Row(
                     [
                         ft.Column(
                             [
-                                ft.Text(stamp, color=TEXT, size=12),
+                                ft.Text(marca, color=TEXT, size=12),
                                 ft.Text(human_size(version["size"]), color=MUTED, size=11),
                             ],
                             spacing=2,
@@ -2159,105 +2177,105 @@ class VortexUI:
             )
 
         def restore(version_id: str) -> None:
-            result = self._request(
+            resultado = self._request(
                 "POST",
                 "/api/files/versions/restore",
                 params={"path": item["path"], "version_id": version_id},
             )
-            if result is not None:
-                self.page.close(history_dialog)
+            if resultado is not None:
+                self.page.close(dialogo_historial)
                 self.page.close(editor_dialog)
                 self._notify("Versión restaurada")
                 self.refresh_listing(self.current_path)
 
-        history_dialog = ft.AlertDialog(
+        dialogo_historial = ft.AlertDialog(
             modal=True,
             title=ft.Text(f"Versiones · {item['name']}", color=TEXT),
-            content=ft.Container(width=440, content=ft.Column(rows, tight=True, spacing=10)),
+            content=ft.Container(width=440, content=ft.Column(filas, tight=True, spacing=10)),
             actions=[
                 ft.TextButton("Borrar todo", icon=ft.icons.DELETE_SWEEP, on_click=clear_all)
-                if versions
+                if versiones
                 else ft.Container(),
-                ft.TextButton("Cerrar", on_click=lambda e: self.page.close(history_dialog)),
+                ft.TextButton("Cerrar", on_click=lambda e: self.page.close(dialogo_historial)),
             ],
         )
-        self.page.open(history_dialog)
+        self.page.open(dialogo_historial)
 
     def show_rename(self, item: dict) -> None:
-        field = self._field("Nuevo nombre", item["name"], autofocus=True)
+        campo = self._field("Nuevo nombre", item["name"], autofocus=True)
 
         def do_rename(e: ft.ControlEvent) -> None:
-            name = (field.value or "").strip()
-            if not name:
+            nombre = (campo.value or "").strip()
+            if not nombre:
                 return
-            result = self._request("PUT", "/api/files/rename", json={"path": item["path"], "new_name": name})
-            if result is not None:
-                self.page.close(dialog)
+            resultado = self._request("PUT", "/api/files/rename", json={"path": item["path"], "new_name": nombre})
+            if resultado is not None:
+                self.page.close(dialogo)
                 self._notify("Elemento renombrado")
                 self.refresh_listing(self.current_path)
 
-        dialog = ft.AlertDialog(
+        dialogo = ft.AlertDialog(
             modal=True,
             title=ft.Text("Renombrar", color=TEXT),
-            content=field,
+            content=campo,
             actions=[
-                ft.TextButton("Cancelar", on_click=lambda e: self.page.close(dialog)),
+                ft.TextButton("Cancelar", on_click=lambda e: self.page.close(dialogo)),
                 ft.ElevatedButton("Renombrar", bgcolor=ACCENT_STRONG, color="#FFFFFF", on_click=do_rename),
             ],
             actions_alignment=ft.MainAxisAlignment.END,
         )
-        field.on_submit = do_rename
-        self.page.open(dialog)
+        campo.on_submit = do_rename
+        self.page.open(dialogo)
 
     def confirm_delete(self, item: dict) -> None:
         def do_delete(e: ft.ControlEvent) -> None:
-            result = self._request("DELETE", "/api/files", params={"path": item["path"]})
-            self.page.close(dialog)
-            if result is not None:
+            resultado = self._request("DELETE", "/api/files", params={"path": item["path"]})
+            self.page.close(dialogo)
+            if resultado is not None:
                 self._notify("Elemento eliminado")
                 self.refresh_listing(self.current_path)
 
-        dialog = ft.AlertDialog(
+        dialogo = ft.AlertDialog(
             modal=True,
             title=ft.Text("Eliminar", color=TEXT),
             content=ft.Text(f"¿Eliminar «{item['name']}» de forma permanente?", color=MUTED, size=13),
             actions=[
-                ft.TextButton("Cancelar", on_click=lambda e: self.page.close(dialog)),
+                ft.TextButton("Cancelar", on_click=lambda e: self.page.close(dialogo)),
                 ft.ElevatedButton("Eliminar", bgcolor=DANGER, color="#FFFFFF", on_click=do_delete),
             ],
             actions_alignment=ft.MainAxisAlignment.END,
         )
-        self.page.open(dialog)
+        self.page.open(dialogo)
 
     def _new_folder(self, e: ft.ControlEvent) -> None:
-        field = self._field("Nombre de la carpeta", autofocus=True)
+        campo = self._field("Nombre de la carpeta", autofocus=True)
 
         def create(ev: ft.ControlEvent) -> None:
-            name = (field.value or "").strip()
-            if not name:
+            nombre = (campo.value or "").strip()
+            if not nombre:
                 return
-            result = self._request("POST", "/api/files/mkdir", json={"path": self.current_path, "name": name})
-            if result is not None:
-                self.page.close(dialog)
+            resultado = self._request("POST", "/api/files/mkdir", json={"path": self.current_path, "name": nombre})
+            if resultado is not None:
+                self.page.close(dialogo)
                 self._notify("Carpeta creada")
                 self.refresh_listing(self.current_path)
 
-        field.on_submit = create
-        dialog = ft.AlertDialog(
+        campo.on_submit = create
+        dialogo = ft.AlertDialog(
             modal=True,
             title=ft.Text("Nueva carpeta", color=TEXT),
-            content=field,
+            content=campo,
             actions=[
-                ft.TextButton("Cancelar", on_click=lambda ev: self.page.close(dialog)),
+                ft.TextButton("Cancelar", on_click=lambda ev: self.page.close(dialogo)),
                 ft.ElevatedButton("Crear", icon=ft.icons.CREATE_NEW_FOLDER, bgcolor=ACCENT_STRONG, color="#FFFFFF", on_click=create),
             ],
             actions_alignment=ft.MainAxisAlignment.END,
         )
-        self.page.open(dialog)
+        self.page.open(dialogo)
 
     def _new_text_file(self, e: ft.ControlEvent) -> None:
-        name_field = self._field("Nombre del archivo", "texto", autofocus=True)
-        content_field = self._field(
+        campo_nombre = self._field("Nombre del archivo", "texto", autofocus=True)
+        campo_contenido = self._field(
             "Escribe tu texto",
             multiline=True,
             min_lines=10,
@@ -2267,45 +2285,45 @@ class VortexUI:
         )
 
         def save(ev: ft.ControlEvent) -> None:
-            name = (name_field.value or "").strip()
-            if name.lower().endswith(".txt"):
-                name = name[:-4]
-            if not name or name in {".", ".."} or any(char in name for char in ("/", "\\", "\x00")):
+            nombre = (campo_nombre.value or "").strip()
+            if nombre.lower().endswith(".txt"):
+                nombre = nombre[:-4]
+            if not nombre or nombre in {".", ".."} or any(caracter in nombre for caracter in ("/", "\\", "\x00")):
                 self._notify("Escribe un nombre válido, sin rutas ni barras.", True)
                 return
-            filename = f"{name}.txt"
-            listing = self._request("GET", "/api/files", params={"path": self.current_path})
-            if listing is None:
+            nombre_archivo = f"{nombre}.txt"
+            listado = self._request("GET", "/api/files", params={"path": self.current_path})
+            if listado is None:
                 return
-            if any(item.get("name", "").casefold() == filename.casefold() for item in listing.get("items", [])):
-                self._notify(f"Ya existe «{filename}» en esta carpeta.", True)
+            if any(elemento.get("name", "").casefold() == nombre_archivo.casefold() for elemento in listado.get("items", [])):
+                self._notify(f"Ya existe «{nombre_archivo}» en esta carpeta.", True)
                 return
-            path = f"{self.current_path}/{filename}".lstrip("/")
-            result = self._request(
+            ruta = f"{self.current_path}/{nombre_archivo}".lstrip("/")
+            resultado = self._request(
                 "PUT",
                 "/api/files/write",
-                json={"path": path, "content": content_field.value or ""},
+                json={"path": ruta, "content": campo_contenido.value or ""},
             )
-            if result is not None:
-                self.page.close(dialog)
-                self._notify(f"{filename} creado")
+            if resultado is not None:
+                self.page.close(dialogo)
+                self._notify(f"{nombre_archivo} creado")
                 self.refresh_listing(self.current_path)
 
-        dialog = ft.AlertDialog(
+        dialogo = ft.AlertDialog(
             modal=True,
             title=ft.Text("Escribir archivo de texto", color=TEXT, size=16),
             content=ft.Container(
                 width=640,
                 height=390,
-                content=ft.Column([name_field, content_field], spacing=14, expand=True),
+                content=ft.Column([campo_nombre, campo_contenido], spacing=14, expand=True),
             ),
             actions=[
-                ft.TextButton("Cancelar", on_click=lambda ev: self.page.close(dialog)),
+                ft.TextButton("Cancelar", on_click=lambda ev: self.page.close(dialogo)),
                 ft.ElevatedButton("Crear .txt", icon=ft.icons.SAVE, bgcolor=ACCENT_STRONG, color="#FFFFFF", on_click=save),
             ],
             actions_alignment=ft.MainAxisAlignment.END,
         )
-        self.page.open(dialog)
+        self.page.open(dialogo)
 
     def _download_zip(self, e: ft.ControlEvent) -> None:
         self._open_url(self._zip_url(self.current_path))
@@ -2316,12 +2334,13 @@ class VortexUI:
             return
         self.file_picker.pick_files(allow_multiple=True, dialog_title="Seleccionar archivos para subir")
 
+    # Cola de subidas con progreso y reanudación.
     def _on_files_picked(self, e: ft.FilePickerResultEvent) -> None:
         if not e.files:
             return
-        paths = [f.path for f in e.files if f.path]
-        if paths and not bool(getattr(self.page, "web", False)):
-            threading.Thread(target=self._upload_worker, args=(paths,), daemon=True).start()
+        rutas = [campo.path for campo in e.files if campo.path]
+        if rutas and not bool(getattr(self.page, "web", False)):
+            threading.Thread(target=self._upload_worker, args=(rutas,), daemon=True).start()
             return
         if not bool(getattr(self.page, "web", False)):
             self._notify("El selector no devolvió rutas de archivo", True)
@@ -2329,30 +2348,30 @@ class VortexUI:
         self.web_upload_queue.clear()
         self.web_upload_results.clear()
         self.web_upload_remaining = len(e.files)
-        uploads = []
+        subidas = []
         try:
-            for picked in e.files:
-                suffix = Path(picked.name).suffix[:20]
-                stored_name = f"{uuid.uuid4().hex}{suffix}"
-                self.web_upload_queue.append(self.web_upload_dir / stored_name)
-                uploads.append(
+            for elegido in e.files:
+                sufijo = Path(elegido.name).suffix[:20]
+                nombre_guardado = f"{uuid.uuid4().hex}{sufijo}"
+                self.web_upload_queue.append(self.web_upload_dir / nombre_guardado)
+                subidas.append(
                     ft.FilePickerUploadFile(
-                        name=picked.name,
-                        upload_url=self.page.get_upload_url(stored_name, 3600),
+                        name=elegido.name,
+                        upload_url=self.page.get_upload_url(nombre_guardado, 3600),
                     )
                 )
-        except Exception as exc:
+        except Exception as excepcion:
             self.web_upload_queue.clear()
             self.web_upload_remaining = 0
-            self._notify(f"No se pudieron preparar los archivos: {exc}", True)
+            self._notify(f"No se pudieron preparar los archivos: {excepcion}", True)
             return
         self.upload_active = True
         self.upload_done = False
         self.upload_error = None
-        self.upload_label = f"Preparando {len(uploads)} archivo(s)…"
+        self.upload_label = f"Preparando {len(subidas)} archivo(s)…"
         self.upload_speed = "Esperando la transferencia"
         self.upload_progress = 0.0
-        self.file_picker.upload(uploads)
+        self.file_picker.upload(subidas)
 
     def _on_file_uploaded(self, e: ft.FilePickerUploadEvent) -> None:
         if e.error:
@@ -2361,10 +2380,10 @@ class VortexUI:
             self.web_upload_queue.clear()
             self.web_upload_remaining = 0
             return
-        progress = e.progress or 0.0
-        if progress < 1:
-            completed = len(self.web_upload_results)
-            self.upload_progress = (completed + progress) / max(completed + self.web_upload_remaining, 1)
+        progreso = e.progress or 0.0
+        if progreso < 1:
+            completado = len(self.web_upload_results)
+            self.upload_progress = (completado + progreso) / max(completado + self.web_upload_remaining, 1)
             self.upload_label = e.file_name
             self.upload_speed = "Recibiendo desde el navegador…"
             return
@@ -2373,32 +2392,32 @@ class VortexUI:
         self.web_upload_results.append(self.web_upload_queue.popleft())
         self.web_upload_remaining -= 1
         if self.web_upload_remaining <= 0:
-            selected = [str(path) for path in self.web_upload_results]
+            seleccionado = [str(ruta) for ruta in self.web_upload_results]
             self.upload_label = "Guardando en la carpeta compartida…"
             self.upload_speed = "Subiendo a Vortex"
-            threading.Thread(target=self._upload_worker, args=(selected,), daemon=True).start()
+            threading.Thread(target=self._upload_worker, args=(seleccionado,), daemon=True).start()
 
     def _upload_worker(self, paths: list[str]) -> None:
-        target_path = self.current_path
-        self.upload_target_path = target_path
+        ruta_destino = self.current_path
+        self.upload_target_path = ruta_destino
         self.upload_cancel.clear()
         self.upload_cancellable = False
         self.upload_active = True
         self.upload_done = False
         self.upload_error = None
-        for path in paths:
+        for ruta in paths:
             if self.upload_cancel.is_set():
                 break
             self.upload_progress = 0.0
-            self.upload_label = Path(path).name
+            self.upload_label = Path(ruta).name
             self.upload_speed = ""
             try:
-                self._upload_one(Path(path), target_path)
-            except Exception as exc:
-                self.upload_error = str(exc)
+                self._upload_one(Path(ruta), ruta_destino)
+            except Exception as excepcion:
+                self.upload_error = str(excepcion)
                 break
             finally:
-                local = Path(path)
+                local = Path(ruta)
                 if local.parent == self.web_upload_dir:
                     try:
                         local.unlink(missing_ok=True)
@@ -2417,126 +2436,126 @@ class VortexUI:
     def _upload_one(self, local: Path, target_dir: str) -> None:
         if self.http is None:
             raise RuntimeError("Cliente HTTP no inicializado")
-        size = local.stat().st_size
-        if size <= self.config.direct_upload_limit:
+        tamano = local.stat().st_size
+        if tamano <= self.config.direct_upload_limit:
             self.upload_cancellable = False
             self.upload_speed = "Subiendo…"
-            with open(local, "rb") as handle:
-                files = {"file": (local.name, handle, "application/octet-stream")}
-                response = self.http.post(
+            with open(local, "rb") as manejador:
+                archivos = {"file": (local.name, manejador, "application/octet-stream")}
+                respuesta = self.http.post(
                     "/api/files/upload",
-                    files=files,
+                    files=archivos,
                     data={"target_dir": target_dir},
                     headers=self._auth_headers(),
                     timeout=None,
                 )
-            if response.status_code >= 400:
-                raise RuntimeError(self._response_error(response))
+            if respuesta.status_code >= 400:
+                raise RuntimeError(self._response_error(respuesta))
             self.upload_progress = 1.0
             return
         self.upload_cancellable = True
-        fingerprint = hashlib.sha256()
-        with open(local, "rb") as source:
-            for block in iter(lambda: source.read(1024 * 1024), b""):
-                fingerprint.update(block)
-        resume_key = hashlib.sha256(
-            f"{self.base_url}|{target_dir}|{local.name}|{size}|{fingerprint.hexdigest()}".encode()
+        huella = hashlib.sha256()
+        with open(local, "rb") as origen:
+            for bloque in iter(lambda: origen.read(1024 * 1024), b""):
+                huella.update(bloque)
+        clave_reanudacion = hashlib.sha256(
+            f"{self.base_url}|{target_dir}|{local.name}|{tamano}|{huella.hexdigest()}".encode()
         ).hexdigest()
-        state_file = app_data_dir() / "resumable_uploads.json"
+        archivo_estado = app_data_dir() / "resumable_uploads.json"
         try:
-            saved_uploads = json.loads(state_file.read_text(encoding="utf-8"))
+            subidas_guardadas = json.loads(archivo_estado.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError):
-            saved_uploads = {}
-        if not isinstance(saved_uploads, dict):
-            saved_uploads = {}
-        saved = saved_uploads.get(resume_key, {})
-        upload_id = saved.get("upload_id")
-        status = None
-        if upload_id:
+            subidas_guardadas = {}
+        if not isinstance(subidas_guardadas, dict):
+            subidas_guardadas = {}
+        guardado = subidas_guardadas.get(clave_reanudacion, {})
+        id_subida = guardado.get("upload_id")
+        estado = None
+        if id_subida:
             try:
-                response = self.http.get(
-                    f"/api/files/upload/{upload_id}", headers=self._auth_headers(), timeout=15
+                respuesta = self.http.get(
+                    f"/api/files/upload/{id_subida}", headers=self._auth_headers(), timeout=15
                 )
-                if response.status_code == 200:
-                    status = response.json()
+                if respuesta.status_code == 200:
+                    estado = respuesta.json()
                     if (
-                        status.get("size") != size
-                        or status.get("filename") != local.name
-                        or status.get("target_dir") != target_dir
+                        estado.get("size") != tamano
+                        or estado.get("filename") != local.name
+                        or estado.get("target_dir") != target_dir
                     ):
-                        status = None
+                        estado = None
             except httpx.HTTPError:
-                status = None
-        if status is None:
-            if upload_id:
-                saved_uploads.pop(resume_key, None)
-            init = self.http.post(
+                estado = None
+        if estado is None:
+            if id_subida:
+                subidas_guardadas.pop(clave_reanudacion, None)
+            inicial = self.http.post(
                 "/api/files/upload/init",
-                json={"filename": local.name, "size": size, "target_dir": target_dir, "chunk_size": self.config.chunk_size},
+                json={"filename": local.name, "size": tamano, "target_dir": target_dir, "chunk_size": self.config.chunk_size},
                 headers=self._auth_headers(),
                 timeout=30,
             )
-            if init.status_code >= 400:
-                raise RuntimeError(self._response_error(init))
-            info = init.json()
-            upload_id = info["upload_id"]
-            status = info
-        saved_uploads[resume_key] = {"upload_id": upload_id}
-        state_file.parent.mkdir(parents=True, exist_ok=True)
-        temp_state = state_file.with_suffix(".tmp")
-        temp_state.write_text(json.dumps(saved_uploads), encoding="utf-8")
-        temp_state.replace(state_file)
-        chunk_size = status["chunk_size"]
-        count = status["chunk_count"]
-        received = set(status.get("received", []))
-        sent = sum(
-            min(chunk_size, max(size - index * chunk_size, 0)) for index in received
+            if inicial.status_code >= 400:
+                raise RuntimeError(self._response_error(inicial))
+            informacion = inicial.json()
+            id_subida = informacion["upload_id"]
+            estado = informacion
+        subidas_guardadas[clave_reanudacion] = {"upload_id": id_subida}
+        archivo_estado.parent.mkdir(parents=True, exist_ok=True)
+        estado_temporal = archivo_estado.with_suffix(".tmp")
+        estado_temporal.write_text(json.dumps(subidas_guardadas), encoding="utf-8")
+        estado_temporal.replace(archivo_estado)
+        tamano_bloque = estado["chunk_size"]
+        cantidad = estado["chunk_count"]
+        recibidos = set(estado.get("received", []))
+        enviado = sum(
+            min(tamano_bloque, max(tamano - indice * tamano_bloque, 0)) for indice in recibidos
         )
-        self.upload_progress = sent / max(size, 1)
-        sent_this_run = 0
-        started = time.time()
-        with open(local, "rb") as handle:
-            for index in range(count):
+        self.upload_progress = enviado / max(tamano, 1)
+        enviados_sesion = 0
+        iniciado = time.time()
+        with open(local, "rb") as manejador:
+            for indice in range(cantidad):
                 if self.upload_cancel.is_set():
                     return
-                if index in received:
+                if indice in recibidos:
                     continue
-                chunk = handle.read(chunk_size)
-                last_error = None
+                bloque = manejador.read(tamano_bloque)
+                ultimo_error = None
                 for _ in range(3):
                     try:
-                        response = self.http.put(
-                            f"/api/files/upload/{upload_id}/{index}",
-                            content=chunk,
+                        respuesta = self.http.put(
+                            f"/api/files/upload/{id_subida}/{indice}",
+                            content=bloque,
                             headers=self._auth_headers(),
                             timeout=None,
                         )
-                        if response.status_code < 400:
-                            last_error = None
+                        if respuesta.status_code < 400:
+                            ultimo_error = None
                             break
-                        last_error = self._response_error(response)
-                    except httpx.HTTPError as exc:
-                        last_error = str(exc)
-                if last_error:
-                    raise RuntimeError(last_error)
-                sent += len(chunk)
-                sent_this_run += len(chunk)
-                self.upload_progress = sent / max(size, 1)
-                elapsed = max(time.time() - started, 0.001)
-                self.upload_speed = human_speed(sent_this_run / elapsed)
-        complete = self.http.post(f"/api/files/upload/{upload_id}/complete", headers=self._auth_headers(), timeout=300)
-        if complete.status_code >= 400:
-            raise RuntimeError(self._response_error(complete))
-        saved_uploads.pop(resume_key, None)
-        temp_state.write_text(json.dumps(saved_uploads), encoding="utf-8")
-        temp_state.replace(state_file)
+                        ultimo_error = self._response_error(respuesta)
+                    except httpx.HTTPError as excepcion:
+                        ultimo_error = str(excepcion)
+                if ultimo_error:
+                    raise RuntimeError(ultimo_error)
+                enviado += len(bloque)
+                enviados_sesion += len(bloque)
+                self.upload_progress = enviado / max(tamano, 1)
+                transcurrido = max(time.time() - iniciado, 0.001)
+                self.upload_speed = human_speed(enviados_sesion / transcurrido)
+        completar = self.http.post(f"/api/files/upload/{id_subida}/complete", headers=self._auth_headers(), timeout=300)
+        if completar.status_code >= 400:
+            raise RuntimeError(self._response_error(completar))
+        subidas_guardadas.pop(clave_reanudacion, None)
+        estado_temporal.write_text(json.dumps(subidas_guardadas), encoding="utf-8")
+        estado_temporal.replace(archivo_estado)
 
     def _response_error(self, response: httpx.Response) -> str:
         try:
-            detail = response.json().get("detail", response.text)
-            if isinstance(detail, dict):
-                return detail.get("message", str(detail))
-            return str(detail)
+            detalle = response.json().get("detail", response.text)
+            if isinstance(detalle, dict):
+                return detalle.get("message", str(detalle))
+            return str(detalle)
         except Exception:
             return response.text or f"HTTP {response.status_code}"
 
@@ -2557,12 +2576,12 @@ class VortexUI:
             self.page.update()
             return
         if self.upload_error:
-            message = self.upload_error
+            mensaje = self.upload_error
             self.upload_error = None
             self.upload_done = False
             self.upload_widget.visible = False
             self.page.update()
-            self._notify(f"Error de subida: {message}", True)
+            self._notify(f"Error de subida: {mensaje}", True)
             if self.current_path == self.upload_target_path:
                 self.refresh_listing(self.upload_target_path)
             return
@@ -2570,16 +2589,17 @@ class VortexUI:
             self.upload_done = False
             self.upload_widget.visible = False
             self.page.update()
-            message = (
+            mensaje = (
                 "Subida cancelada; puedes reanudarla al seleccionar el mismo archivo."
                 if self.upload_cancel.is_set()
                 else "Subida completada"
             )
             self.upload_cancel.clear()
-            self._notify(message)
+            self._notify(mensaje)
             if self.current_path == self.upload_target_path:
                 self.refresh_listing(self.upload_target_path)
 
+    # Paleta rápida de búsqueda y comandos.
     def open_palette(self) -> None:
         if self.palette_dialog is not None:
             return
@@ -2641,26 +2661,26 @@ class VortexUI:
         if self.palette_results is None:
             return
         if query:
-            data = self._request("GET", "/api/files/search", params={"path": self.current_path, "q": query, "limit": 60})
-            items = data["items"] if data else []
+            datos = self._request("GET", "/api/files/search", params={"path": self.current_path, "q": query, "limit": 60})
+            elementos = datos["items"] if datos else []
         else:
-            data = self._request("GET", "/api/files", params={"path": self.current_path})
-            items = data["items"] if data else []
+            datos = self._request("GET", "/api/files", params={"path": self.current_path})
+            elementos = datos["items"] if datos else []
         self.palette_results.controls.clear()
-        if not items:
+        if not elementos:
             self.palette_results.controls.append(ft.Container(padding=20, content=ft.Text("Sin coincidencias", size=12, color=MUTED)))
-        for item in items[:60]:
+        for elemento in elementos[:60]:
             self.palette_results.controls.append(
                 ft.Container(
                     padding=ft.padding.symmetric(horizontal=10, vertical=8),
                     border_radius=8,
-                    on_click=lambda e, it=item: self._palette_open(it),
+                    on_click=lambda e, it=elemento: self._palette_open(it),
                     on_hover=self._hover_row,
                     content=ft.Row(
                         [
-                            ft.Icon(name=icon_for_kind(item["kind"]), color=color_for_kind(item["kind"]), size=18),
-                            ft.Text(item["name"], size=13, color=TEXT, expand=True, overflow=ft.TextOverflow.ELLIPSIS),
-                            ft.Text("Carpeta" if item["is_dir"] else human_size(item["size"]), size=11, color=MUTED),
+                            ft.Icon(name=icon_for_kind(elemento["kind"]), color=color_for_kind(elemento["kind"]), size=18),
+                            ft.Text(elemento["name"], size=13, color=TEXT, expand=True, overflow=ft.TextOverflow.ELLIPSIS),
+                            ft.Text("Carpeta" if elemento["is_dir"] else human_size(elemento["size"]), size=11, color=MUTED),
                         ],
                         vertical_alignment=ft.CrossAxisAlignment.CENTER,
                         spacing=10,
@@ -2676,6 +2696,7 @@ class VortexUI:
         self._close_palette()
         self.open_item(item)
 
+    # Consola de auditoría en vivo para el host.
     def _open_logs(self, e: ft.ControlEvent) -> None:
         if self.role != "host":
             self._notify("La consola de logs solo está disponible para el host", True)
@@ -2683,14 +2704,14 @@ class VortexUI:
         self.logs_list = ft.ListView(expand=True, spacing=1, height=440, auto_scroll=True)
         self.logs_count_seen = -1
         self.logs_dialog_open = True
-        dialog = ft.AlertDialog(
+        dialogo = ft.AlertDialog(
             modal=False,
             title=ft.Row([ft.Icon(name=ft.icons.TERMINAL, color=ACCENT, size=18), ft.Text("Consola de auditoría en tiempo real", color=TEXT, size=15)]),
             content=ft.Container(width=860, content=self.logs_list),
-            actions=[ft.TextButton("Cerrar", on_click=lambda ev: self._close_logs(dialog))],
+            actions=[ft.TextButton("Cerrar", on_click=lambda ev: self._close_logs(dialogo))],
             actions_alignment=ft.MainAxisAlignment.END,
         )
-        self.page.open(dialog)
+        self.page.open(dialogo)
         self._refresh_logs()
 
     def _close_logs(self, dialog: ft.AlertDialog) -> None:
@@ -2700,24 +2721,25 @@ class VortexUI:
     def _refresh_logs(self) -> None:
         if self.logs_list is None:
             return
-        records = list(self.log_buffer)[-200:]
-        if len(records) == self.logs_count_seen:
+        registros = list(self.log_buffer)[-200:]
+        if len(registros) == self.logs_count_seen:
             return
-        self.logs_count_seen = len(records)
+        self.logs_count_seen = len(registros)
         self.logs_list.controls.clear()
-        colors = {"INFO": MUTED, "WARNING": WARNING, "ERROR": DANGER, "SECURITY": "#F472B6"}
-        for record in records:
-            severity = record.get("severity", "INFO")
-            line = f"{record.get('timestamp', '')}  {severity:<8} {record.get('action', '')}  {record.get('client_ip', '')}  {record.get('target_path', '')}  {record.get('status_code', '')}"
-            self.logs_list.controls.append(ft.Text(line, size=10, color=colors.get(severity, MUTED), font_family="monospace", selectable=True))
+        colores = {"INFO": MUTED, "WARNING": WARNING, "ERROR": DANGER, "SECURITY": "#F472B6"}
+        for registro in registros:
+            severidad = registro.get("severity", "INFO")
+            linea = f"{registro.get('timestamp', '')}  {severidad:<8} {registro.get('action', '')}  {registro.get('client_ip', '')}  {registro.get('target_path', '')}  {registro.get('status_code', '')}"
+            self.logs_list.controls.append(ft.Text(linea, size=10, color=colores.get(severidad, MUTED), font_family="monospace", selectable=True))
         try:
             self.page.update()
         except Exception:
             pass
 
+    # Parada ordenada del servidor y limpieza de recursos.
     def _stop_server(self, e: ft.ControlEvent) -> None:
         def do_stop(ev: ft.ControlEvent) -> None:
-            self.page.close(dialog)
+            self.page.close(dialogo)
             if self.log_unsubscribe:
                 try:
                     self.log_unsubscribe()
@@ -2735,26 +2757,26 @@ class VortexUI:
             self._notify("Servidor detenido")
             self.show_setup()
 
-        dialog = ft.AlertDialog(
+        dialogo = ft.AlertDialog(
             modal=True,
             title=ft.Text("Detener servidor", color=TEXT),
             content=ft.Text("Se cerrarán las conexiones y el acceso a los archivos quedará suspendido.", color=MUTED, size=13),
             actions=[
-                ft.TextButton("Cancelar", on_click=lambda ev: self.page.close(dialog)),
+                ft.TextButton("Cancelar", on_click=lambda ev: self.page.close(dialogo)),
                 ft.ElevatedButton("Detener", bgcolor=DANGER, color="#FFFFFF", on_click=do_stop),
             ],
             actions_alignment=ft.MainAxisAlignment.END,
         )
-        self.page.open(dialog)
+        self.page.open(dialogo)
 
     def _on_keyboard(self, e: ft.KeyboardEvent) -> None:
-        key = (e.key or "").lower()
-        if e.ctrl and key == "k":
+        clave = (e.key or "").lower()
+        if e.ctrl and clave == "k":
             self.open_palette()
-        elif key == "escape":
+        elif clave == "escape":
             if self.palette_dialog is not None:
                 self._close_palette()
-        elif e.ctrl and key == "r" and self.http is not None:
+        elif e.ctrl and clave == "r" and self.http is not None:
             self.refresh_listing(self.current_path)
 
 
@@ -2786,7 +2808,7 @@ def _enable_flet_web_compat() -> None:
 
 
 def run_app() -> None:
-    target = lambda page: VortexUI(page).start()
+    objetivo = lambda page: VortexUI(page).start()
     if not _libmpv_available():
         print(
             "Vortex: falta libmpv.so.1, necesario para la ventana nativa de Flet en Linux.\n"
@@ -2797,9 +2819,9 @@ def run_app() -> None:
         )
         _enable_flet_web_compat()
         ft.app(
-            target=target,
+            target=objetivo,
             view=ft.AppView.WEB_BROWSER,
             upload_dir=str(app_data_dir() / "browser-picker"),
         )
         return
-    ft.app(target=target)
+    ft.app(target=objetivo)

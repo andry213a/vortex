@@ -1,3 +1,4 @@
+# Flujo de integración continua para compilar y ejecutar las pruebas.
 name: Tests
 
 on:

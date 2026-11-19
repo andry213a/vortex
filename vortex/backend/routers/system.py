@@ -1,3 +1,5 @@
+# Rutas de información del sistema y comprobación de puertos.
+
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Query
@@ -22,15 +24,15 @@ def file_changes(
 
 @router.get("/info", response_model=SystemInfoResponse)
 def info(access: Access = Depends(require_read), runtime: Runtime = Depends(get_runtime)) -> SystemInfoResponse:
-    usage = disk_usage(runtime.base_dir)
-    config = runtime.config
+    uso = disk_usage(runtime.base_dir)
+    configuracion = runtime.config
     return SystemInfoResponse(
         base_dir=str(runtime.base_dir),
-        port=config.port,
-        auth_mode=config.auth_mode,
-        hostname=config.hostname,
+        port=configuracion.port,
+        auth_mode=configuracion.auth_mode,
+        hostname=configuracion.hostname,
         uptime=runtime.uptime(),
-        disk=DiskInfo(**usage),
+        disk=DiskInfo(**uso),
         platform=platform_info(),
         version=__version__,
     )
@@ -39,10 +41,10 @@ def info(access: Access = Depends(require_read), runtime: Runtime = Depends(get_
 @router.get("/port-check", response_model=PortCheckResponse)
 def port_check(port: int = Query(..., ge=1, le=65535), runtime: Runtime = Depends(get_runtime), access: Access = Depends(require_read)) -> PortCheckResponse:
     if port_in_use(port):
-        suggestion = suggest_free_port(port + 1)
-        return PortCheckResponse(port=port, available=False, suggestion=suggestion, message=f"El puerto {port} está ocupado")
+        sugerencia = suggest_free_port(port + 1)
+        return PortCheckResponse(port=port, available=False, suggestion=sugerencia, message=f"El puerto {port} está ocupado")
     try:
         validate_port(port)
-    except ValueError as exc:
-        return PortCheckResponse(port=port, available=False, suggestion=suggest_free_port(port + 1), message=str(exc))
+    except ValueError as excepcion:
+        return PortCheckResponse(port=port, available=False, suggestion=suggest_free_port(port + 1), message=str(excepcion))
     return PortCheckResponse(port=port, available=True, message="Puerto disponible")

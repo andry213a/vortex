@@ -1,3 +1,5 @@
+# Pruebas de la ventana Flet y del arranque en modo navegador.
+
 from __future__ import annotations
 
 import flet as ft
@@ -56,32 +58,32 @@ class _StubPage:
 
 
 def test_desktop_uses_custom_themed_window() -> None:
-    page = _StubPage(web=False)
-    VortexUI(page).start()
+    pagina = _StubPage(web=False)
+    VortexUI(pagina).start()
 
-    assert page.window.title_bar_hidden is True
-    assert page.window.title_bar_buttons_hidden is True
-    root = page.controls[0]
-    assert isinstance(root, ft.Column)
-    title_bar = root.controls[0]
-    assert isinstance(title_bar, ft.Container)
-    assert title_bar.height == 46
-    assert title_bar.bgcolor == "#111827"
-    row = title_bar.content
-    assert isinstance(row, ft.Row)
-    assert isinstance(row.controls[0], ft.WindowDragArea)
-    controls = row.controls[1]
-    assert isinstance(controls, ft.Row)
-    assert len(controls.controls) == 4
-    assert controls.controls[0].tooltip == "Personalizar colores"
+    assert pagina.window.title_bar_hidden is True
+    assert pagina.window.title_bar_buttons_hidden is True
+    raiz = pagina.controls[0]
+    assert isinstance(raiz, ft.Column)
+    barra_titulo = raiz.controls[0]
+    assert isinstance(barra_titulo, ft.Container)
+    assert barra_titulo.height == 46
+    assert barra_titulo.bgcolor == "#111827"
+    fila = barra_titulo.content
+    assert isinstance(fila, ft.Row)
+    assert isinstance(fila.controls[0], ft.WindowDragArea)
+    controles = fila.controls[1]
+    assert isinstance(controles, ft.Row)
+    assert len(controles.controls) == 4
+    assert controles.controls[0].tooltip == "Personalizar colores"
 
 
 def test_web_mode_keeps_native_page_root() -> None:
-    page = _StubPage(web=True)
-    VortexUI(page).start()
+    pagina = _StubPage(web=True)
+    VortexUI(pagina).start()
 
-    assert page.window.title_bar_hidden is False
-    assert not isinstance(page.controls[0], ft.Column)
+    assert pagina.window.title_bar_hidden is False
+    assert not isinstance(pagina.controls[0], ft.Column)
 
 
 def test_libmpv_check_skips_non_linux(monkeypatch) -> None:
@@ -102,39 +104,39 @@ def test_libmpv_check_detects_missing_library(monkeypatch) -> None:
 
 
 def test_run_app_falls_back_to_browser_without_libmpv(monkeypatch, capsys) -> None:
-    calls: list[dict] = []
+    llamadas: list[dict] = []
     monkeypatch.setattr(frontend_app, "_libmpv_available", lambda: False)
-    monkeypatch.setattr(frontend_app.ft, "app", lambda **kwargs: calls.append(kwargs))
+    monkeypatch.setattr(frontend_app.ft, "app", lambda **kwargs: llamadas.append(kwargs))
 
     frontend_app.run_app()
 
-    assert len(calls) == 1
-    assert calls[0]["view"] == ft.AppView.WEB_BROWSER
+    assert len(llamadas) == 1
+    assert llamadas[0]["view"] == ft.AppView.WEB_BROWSER
     assert "libmpv.so.1" in capsys.readouterr().err
 
 
 def test_flet_web_compat_ignores_removed_openapi_prefix(monkeypatch) -> None:
     import fastapi
 
-    seen: dict = {}
+    vistos: dict = {}
 
     def fake_init(self, *args, **kwargs) -> None:
-        seen.update(kwargs)
+        vistos.update(kwargs)
 
     monkeypatch.setattr(fastapi.FastAPI, "__init__", fake_init)
     frontend_app._enable_flet_web_compat()
     fastapi.FastAPI.__init__(object(), openapi_prefix="/vortex", debug=True)
 
-    assert "openapi_prefix" not in seen
-    assert seen["debug"] is True
+    assert "openapi_prefix" not in vistos
+    assert vistos["debug"] is True
 
 
 def test_run_app_uses_native_window_when_libmpv_exists(monkeypatch) -> None:
-    calls: list[dict] = []
+    llamadas: list[dict] = []
     monkeypatch.setattr(frontend_app, "_libmpv_available", lambda: True)
-    monkeypatch.setattr(frontend_app.ft, "app", lambda **kwargs: calls.append(kwargs))
+    monkeypatch.setattr(frontend_app.ft, "app", lambda **kwargs: llamadas.append(kwargs))
 
     frontend_app.run_app()
 
-    assert len(calls) == 1
-    assert "view" not in calls[0]
+    assert len(llamadas) == 1
+    assert "view" not in llamadas[0]

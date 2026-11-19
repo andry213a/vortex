@@ -1,3 +1,5 @@
+# Registro de auditoría JSON rotativo y difusión a listeners en vivo.
+
 from __future__ import annotations
 
 import json
@@ -41,14 +43,16 @@ class _LineFormatter(logging.Formatter):
         return record.getMessage()
 
 
+# Registro de eventos antes de que exista un Runtime activo.
 def log_standalone(**kwargs: Any) -> dict[str, Any]:
     """Registra un evento sin depender de un Runtime (p. ej. antes de arrancar el servidor)."""
     from ..config import app_data_dir
 
-    logger = AuditLogger(app_data_dir() / "logs" / "audit.log")
-    return logger.log(**kwargs)
+    registrador = AuditLogger(app_data_dir() / "logs" / "audit.log")
+    return registrador.log(**kwargs)
 
 
+# Logger JSON con rotación, listeners y cola de auditoría.
 class AuditLogger:
     def __init__(self, log_file: Path) -> None:
         log_file.parent.mkdir(parents=True, exist_ok=True)
@@ -59,15 +63,16 @@ class AuditLogger:
         self._logger.setLevel(logging.INFO)
         self._logger.propagate = False
         if not self._logger.handlers:
-            handler = RotatingFileHandler(
+            manejador = RotatingFileHandler(
                 log_file,
                 maxBytes=MAX_AUDIT_BYTES,
                 backupCount=AUDIT_BACKUPS,
                 encoding="utf-8",
             )
-            handler.setFormatter(_LineFormatter())
-            self._logger.addHandler(handler)
+            manejador.setFormatter(_LineFormatter())
+            self._logger.addHandler(manejador)
 
+    # Construye el evento, lo escribe en disco y lo difunde en vivo.
     def log(
         self,
         *,
@@ -80,7 +85,7 @@ class AuditLogger:
         status_code: int = 0,
         details: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
-        record = {
+        registro = {
             "timestamp": datetime.now(timezone.utc).isoformat(timespec="milliseconds"),
             "event_id": event_id or uuid.uuid4().hex[:12],
             "severity": severity,
@@ -91,11 +96,12 @@ class AuditLogger:
             "status_code": int(status_code or 0),
             "details": details or {},
         }
-        line = json.dumps(record, ensure_ascii=False, default=str)
-        self._logger.info(line)
-        self._broadcast(record)
-        return record
+        linea = json.dumps(registro, ensure_ascii=False, default=str)
+        self._logger.info(linea)
+        self._broadcast(registro)
+        return registro
 
+    # Suscribe un callback y devuelve la función para cancelarlo.
     def add_listener(self, callback: Callable[[dict[str, Any]], None]) -> Callable[[], None]:
         with self._lock:
             self._listeners.append(callback)
@@ -109,24 +115,25 @@ class AuditLogger:
 
     def _broadcast(self, record: dict[str, Any]) -> None:
         with self._lock:
-            listeners = list(self._listeners)
-        for callback in listeners:
+            escuchadores = list(self._listeners)
+        for retorno in escuchadores:
             try:
-                callback(record)
+                retorno(record)
             except Exception:
                 continue
 
+    # Devuelve los últimos eventos válidos ignorando líneas corruptas.
     def tail(self, limit: int = 100) -> list[dict[str, Any]]:
         if not self.log_file.exists():
             return []
         try:
-            lines = self.log_file.read_text(encoding="utf-8").splitlines()
+            lineas = self.log_file.read_text(encoding="utf-8").splitlines()
         except OSError:
             return []
-        result: list[dict[str, Any]] = []
-        for line in lines[-limit:]:
+        resultado: list[dict[str, Any]] = []
+        for linea in lineas[-limit:]:
             try:
-                result.append(json.loads(line))
+                resultado.append(json.loads(linea))
             except json.JSONDecodeError:
                 continue
-        return result
+        return resultado

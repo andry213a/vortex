@@ -1,3 +1,4 @@
+# Flujo de integración continua que empaqueta Vortex.exe para Windows.
 name: Windows build
 
 on:

@@ -1,3 +1,5 @@
+# Fábrica de la aplicación FastAPI y montaje de routers y SPA.
+
 from __future__ import annotations
 
 from fastapi import FastAPI, Request
@@ -14,52 +16,53 @@ from .state import Runtime
 STATIC_DIR = static_dir()
 
 
+# Construcción de FastAPI, routers, estáticos y fallback de la SPA.
 def create_app(config: ServerConfig, runtime: Runtime | None = None) -> FastAPI:
     config.validate()
     runtime = runtime or Runtime(config)
-    app = FastAPI(
+    aplicacion = FastAPI(
         title="Vortex",
         version=__version__,
         docs_url=None,
         redoc_url=None,
         openapi_url=None,
     )
-    app.state.runtime = runtime
-    app.add_middleware(
+    aplicacion.state.runtime = runtime
+    aplicacion.add_middleware(
         CORSMiddleware,
         allow_origins=["*"],
         allow_methods=["*"],
         allow_headers=["*"],
         expose_headers=["Content-Disposition", "Content-Range", "Accept-Ranges", "Content-Length"],
     )
-    app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
-    app.include_router(system.router, prefix="/api/system", tags=["system"])
-    app.include_router(files.router, prefix="/api/files", tags=["files"])
-    app.include_router(logs.router, prefix="/api", tags=["logs"])
+    aplicacion.include_router(auth.router, prefix="/api/auth", tags=["auth"])
+    aplicacion.include_router(system.router, prefix="/api/system", tags=["system"])
+    aplicacion.include_router(files.router, prefix="/api/files", tags=["files"])
+    aplicacion.include_router(logs.router, prefix="/api", tags=["logs"])
 
     if STATIC_DIR.exists():
-        app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
+        aplicacion.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
-    @app.get("/api/health")
+    @aplicacion.get("/api/health")
     def health() -> dict[str, str]:
         return {"status": "ok", "version": __version__}
 
-    index_file = STATIC_DIR / "index.html"
-    static_root = STATIC_DIR.resolve()
+    archivo_indice = STATIC_DIR / "index.html"
+    raiz_estatica = STATIC_DIR.resolve()
 
-    @app.get("/{full_path:path}")
+    @aplicacion.get("/{full_path:path}")
     def spa(request: Request, full_path: str):
         if full_path.startswith("api/") or full_path == "api":
             return JSONResponse({"detail": "No encontrado"}, status_code=404)
-        candidate = STATIC_DIR / full_path
+        candidato = STATIC_DIR / full_path
         try:
-            resolved = candidate.resolve()
+            resuelto = candidato.resolve()
         except OSError:
-            resolved = None
-        if resolved is not None and resolved.is_relative_to(static_root) and resolved.is_file():
-            return FileResponse(resolved)
-        if index_file.exists():
-            return FileResponse(index_file)
+            resuelto = None
+        if resuelto is not None and resuelto.is_relative_to(raiz_estatica) and resuelto.is_file():
+            return FileResponse(resuelto)
+        if archivo_indice.exists():
+            return FileResponse(archivo_indice)
         return JSONResponse({"detail": "La interfaz web no está incluida en esta compilación"}, status_code=404)
 
-    return app
+    return aplicacion

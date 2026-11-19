@@ -1,3 +1,5 @@
+# Pruebas de subidas por bloques, reanudación, aborto y limpieza.
+
 from __future__ import annotations
 
 import os
@@ -22,140 +24,140 @@ CHUNK = 256 * 1024
 
 
 def _init_upload(client, headers, **overrides):
-    payload = {
+    carga = {
         "filename": "archivo.bin",
         "size": 3 * CHUNK,
         "target_dir": "",
         "chunk_size": CHUNK,
     }
-    payload.update(overrides)
-    return client.post("/api/files/upload/init", json=payload, headers=headers)
+    carga.update(overrides)
+    return client.post("/api/files/upload/init", json=carga, headers=headers)
 
 
 def test_init_returns_metadata_without_chunks(app_bundle, auth_headers):
-    response = _init_upload(app_bundle, auth_headers, filename="inicial.bin")
-    assert response.status_code == 200, response.text
-    info = response.json()
-    assert info["filename"] == "inicial.bin"
-    assert info["chunk_size"] == CHUNK
-    assert info["chunk_count"] == 3
-    assert info["received"] == []
-    assert len(info["upload_id"]) == 32
+    respuesta = _init_upload(app_bundle, auth_headers, filename="inicial.bin")
+    assert respuesta.status_code == 200, respuesta.text
+    informacion = respuesta.json()
+    assert informacion["filename"] == "inicial.bin"
+    assert informacion["chunk_size"] == CHUNK
+    assert informacion["chunk_count"] == 3
+    assert informacion["received"] == []
+    assert len(informacion["upload_id"]) == 32
 
-    status = app_bundle.get(f"/api/files/upload/{info['upload_id']}", headers=auth_headers)
-    assert status.status_code == 200
-    assert status.json()["received"] == []
+    estado = app_bundle.get(f"/api/files/upload/{informacion['upload_id']}", headers=auth_headers)
+    assert estado.status_code == 200
+    assert estado.json()["received"] == []
 
 
 def test_chunks_can_arrive_out_of_order_and_resume(app_bundle, auth_headers):
-    payload = b"A" * CHUNK + b"B" * CHUNK + b"C" * 123
-    info = _init_upload(app_bundle, auth_headers, size=len(payload)).json()
-    upload_id = info["upload_id"]
+    carga = b"A" * CHUNK + b"B" * CHUNK + b"C" * 123
+    informacion = _init_upload(app_bundle, auth_headers, size=len(carga)).json()
+    id_subida = informacion["upload_id"]
 
-    last = app_bundle.put(
-        f"/api/files/upload/{upload_id}/2",
-        content=payload[2 * CHUNK :],
+    ultimo = app_bundle.put(
+        f"/api/files/upload/{id_subida}/2",
+        content=carga[2 * CHUNK :],
         headers=auth_headers,
     )
-    assert last.status_code == 200
-    assert last.json()["received"] == [2]
+    assert ultimo.status_code == 200
+    assert ultimo.json()["received"] == [2]
 
-    resumed = app_bundle.get(f"/api/files/upload/{upload_id}", headers=auth_headers)
-    assert resumed.json()["received"] == [2]
+    reanudado = app_bundle.get(f"/api/files/upload/{id_subida}", headers=auth_headers)
+    assert reanudado.json()["received"] == [2]
 
-    for index in (0, 1):
-        chunk = payload[index * CHUNK : (index + 1) * CHUNK]
-        response = app_bundle.put(
-            f"/api/files/upload/{upload_id}/{index}",
-            content=chunk,
+    for indice in (0, 1):
+        bloque = carga[indice * CHUNK : (indice + 1) * CHUNK]
+        respuesta = app_bundle.put(
+            f"/api/files/upload/{id_subida}/{indice}",
+            content=bloque,
             headers=auth_headers,
         )
-        assert response.status_code == 200
-    assert response.json()["received_count"] == 3
+        assert respuesta.status_code == 200
+    assert respuesta.json()["received_count"] == 3
 
-    complete = app_bundle.post(f"/api/files/upload/{upload_id}/complete", headers=auth_headers)
-    assert complete.status_code == 201, complete.text
-    assert (app_bundle.base_dir / "archivo.bin").read_bytes() == payload
-    assert app_bundle.get(f"/api/files/upload/{upload_id}", headers=auth_headers).status_code == 404
+    completar = app_bundle.post(f"/api/files/upload/{id_subida}/complete", headers=auth_headers)
+    assert completar.status_code == 201, completar.text
+    assert (app_bundle.base_dir / "archivo.bin").read_bytes() == carga
+    assert app_bundle.get(f"/api/files/upload/{id_subida}", headers=auth_headers).status_code == 404
 
 
 def test_complete_reports_missing_chunks(app_bundle, auth_headers):
-    info = _init_upload(app_bundle, auth_headers, filename="parcial.bin").json()
-    upload_id = info["upload_id"]
+    informacion = _init_upload(app_bundle, auth_headers, filename="parcial.bin").json()
+    id_subida = informacion["upload_id"]
     app_bundle.put(
-        f"/api/files/upload/{upload_id}/0",
+        f"/api/files/upload/{id_subida}/0",
         content=b"x" * CHUNK,
         headers=auth_headers,
     )
-    complete = app_bundle.post(f"/api/files/upload/{upload_id}/complete", headers=auth_headers)
-    assert complete.status_code == 400
-    assert complete.json()["detail"]["missing"] == [1, 2]
+    completar = app_bundle.post(f"/api/files/upload/{id_subida}/complete", headers=auth_headers)
+    assert completar.status_code == 400
+    assert completar.json()["detail"]["missing"] == [1, 2]
     assert not (app_bundle.base_dir / "parcial.bin").exists()
 
 
 def test_complete_renames_on_conflict(app_bundle, auth_headers):
-    info = _init_upload(app_bundle, auth_headers, filename="hola.txt", size=len(b"nuevo")).json()
-    upload_id = info["upload_id"]
+    informacion = _init_upload(app_bundle, auth_headers, filename="hola.txt", size=len(b"nuevo")).json()
+    id_subida = informacion["upload_id"]
     app_bundle.put(
-        f"/api/files/upload/{upload_id}/0",
+        f"/api/files/upload/{id_subida}/0",
         content=b"nuevo",
         headers=auth_headers,
     )
-    complete = app_bundle.post(f"/api/files/upload/{upload_id}/complete", headers=auth_headers)
-    assert complete.status_code == 201, complete.text
-    assert complete.json()["name"] == "hola_1.txt"
+    completar = app_bundle.post(f"/api/files/upload/{id_subida}/complete", headers=auth_headers)
+    assert completar.status_code == 201, completar.text
+    assert completar.json()["name"] == "hola_1.txt"
     assert (app_bundle.base_dir / "hola_1.txt").read_bytes() == b"nuevo"
 
 
 def test_abort_removes_upload_and_is_idempotent(app_bundle, auth_headers):
-    info = _init_upload(app_bundle, auth_headers, filename="cancelar.bin").json()
-    upload_id = info["upload_id"]
-    upload_dir = app_bundle.runtime.uploads.root / upload_id
-    assert upload_dir.is_dir()
+    informacion = _init_upload(app_bundle, auth_headers, filename="cancelar.bin").json()
+    id_subida = informacion["upload_id"]
+    directorio_subida = app_bundle.runtime.uploads.root / id_subida
+    assert directorio_subida.is_dir()
 
-    aborted = app_bundle.delete(f"/api/files/upload/{upload_id}", headers=auth_headers)
-    assert aborted.status_code == 200
-    assert not upload_dir.exists()
-    assert app_bundle.get(f"/api/files/upload/{upload_id}", headers=auth_headers).status_code == 404
+    abortado = app_bundle.delete(f"/api/files/upload/{id_subida}", headers=auth_headers)
+    assert abortado.status_code == 200
+    assert not directorio_subida.exists()
+    assert app_bundle.get(f"/api/files/upload/{id_subida}", headers=auth_headers).status_code == 404
 
-    again = app_bundle.delete(f"/api/files/upload/{upload_id}", headers=auth_headers)
-    assert again.status_code == 200
+    otra_vez = app_bundle.delete(f"/api/files/upload/{id_subida}", headers=auth_headers)
+    assert otra_vez.status_code == 200
 
 
 def test_unknown_and_malformed_upload_ids(app_bundle, auth_headers):
-    missing = f"/api/files/upload/{uuid.uuid4().hex}"
-    assert app_bundle.get(missing, headers=auth_headers).status_code == 404
-    malformed = app_bundle.get("/api/files/upload/no-es-un-id", headers=auth_headers)
-    assert malformed.status_code == 404
+    faltantes = f"/api/files/upload/{uuid.uuid4().hex}"
+    assert app_bundle.get(faltantes, headers=auth_headers).status_code == 404
+    malformado = app_bundle.get("/api/files/upload/no-es-un-id", headers=auth_headers)
+    assert malformado.status_code == 404
     assert app_bundle.put(
-        f"{missing}/0",
+        f"{faltantes}/0",
         content=b"x",
         headers=auth_headers,
     ).status_code == 404
-    assert app_bundle.post(f"{missing}/complete", headers=auth_headers).status_code == 404
+    assert app_bundle.post(f"{faltantes}/complete", headers=auth_headers).status_code == 404
 
 
 def test_chunk_index_and_size_validation(app_bundle, auth_headers):
-    info = _init_upload(app_bundle, auth_headers, filename="limites.bin").json()
-    upload_id = info["upload_id"]
-    out_of_range = app_bundle.put(
-        f"/api/files/upload/{upload_id}/99",
+    informacion = _init_upload(app_bundle, auth_headers, filename="limites.bin").json()
+    id_subida = informacion["upload_id"]
+    fuera_rango = app_bundle.put(
+        f"/api/files/upload/{id_subida}/99",
         content=b"x",
         headers=auth_headers,
     )
-    assert out_of_range.status_code == 400
-    too_big = app_bundle.put(
-        f"/api/files/upload/{upload_id}/0",
+    assert fuera_rango.status_code == 400
+    demasiado_grande = app_bundle.put(
+        f"/api/files/upload/{id_subida}/0",
         content=b"x" * (CHUNK + 1),
         headers=auth_headers,
     )
-    assert too_big.status_code == 400
-    negative = app_bundle.put(
-        f"/api/files/upload/{upload_id}/-1",
+    assert demasiado_grande.status_code == 400
+    negativo = app_bundle.put(
+        f"/api/files/upload/{id_subida}/-1",
         content=b"x",
         headers=auth_headers,
     )
-    assert negative.status_code == 400
+    assert negativo.status_code == 400
 
 
 def test_init_rejects_bad_targets_and_names(app_bundle, auth_headers):
@@ -166,55 +168,55 @@ def test_init_rejects_bad_targets_and_names(app_bundle, auth_headers):
 
 
 def test_empty_file_roundtrip(app_bundle, auth_headers):
-    info = _init_upload(app_bundle, auth_headers, filename="vacio.bin", size=0).json()
-    assert info["chunk_count"] == 1
-    upload_id = info["upload_id"]
-    saved = app_bundle.put(
-        f"/api/files/upload/{upload_id}/0",
+    informacion = _init_upload(app_bundle, auth_headers, filename="vacio.bin", size=0).json()
+    assert informacion["chunk_count"] == 1
+    id_subida = informacion["upload_id"]
+    guardado = app_bundle.put(
+        f"/api/files/upload/{id_subida}/0",
         content=b"",
         headers=auth_headers,
     )
-    assert saved.status_code == 200
-    complete = app_bundle.post(f"/api/files/upload/{upload_id}/complete", headers=auth_headers)
-    assert complete.status_code == 201, complete.text
+    assert guardado.status_code == 200
+    completar = app_bundle.post(f"/api/files/upload/{id_subida}/complete", headers=auth_headers)
+    assert completar.status_code == 201, completar.text
     assert (app_bundle.base_dir / "vacio.bin").read_bytes() == b""
 
 
 def test_cleanup_stale_keeps_active_uploads(tmp_path, base_dir):
-    manager = UploadManager(tmp_path / "uploads", base_dir, CHUNK)
-    active_id = manager.init("activo.bin", CHUNK, "")["upload_id"]
-    stale = manager.init("viejo.bin", CHUNK, "")
-    stale_dir = manager.root / stale["upload_id"]
-    old = time.time() - 2 * 24 * 60 * 60
-    os.utime(stale_dir, (old, old))
+    gestor = UploadManager(tmp_path / "uploads", base_dir, CHUNK)
+    id_activo = gestor.init("activo.bin", CHUNK, "")["upload_id"]
+    obsoleto = gestor.init("viejo.bin", CHUNK, "")
+    directorio_obsoleto = gestor.root / obsoleto["upload_id"]
+    anterior = time.time() - 2 * 24 * 60 * 60
+    os.utime(directorio_obsoleto, (anterior, anterior))
 
-    stale_orphan = manager.root / ("a" * 32)
-    stale_orphan.mkdir()
-    os.utime(stale_orphan, (old, old))
-    foreign = manager.root / "no-es-un-id"
-    foreign.mkdir()
-    os.utime(foreign, (old, old))
-    old_file = manager.root / ("b" * 32)
-    old_file.write_bytes(b"x")
-    os.utime(old_file, (old, old))
+    huerfano_obsoleto = gestor.root / ("a" * 32)
+    huerfano_obsoleto.mkdir()
+    os.utime(huerfano_obsoleto, (anterior, anterior))
+    ajeno = gestor.root / "no-es-un-id"
+    ajeno.mkdir()
+    os.utime(ajeno, (anterior, anterior))
+    archivo_anterior = gestor.root / ("b" * 32)
+    archivo_anterior.write_bytes(b"x")
+    os.utime(archivo_anterior, (anterior, anterior))
 
-    removed = manager.cleanup_stale(max_age_seconds=60 * 60)
-    assert removed == 2
-    assert (manager.root / active_id).is_dir()
-    assert not stale_dir.exists()
-    assert not stale_orphan.exists()
-    assert foreign.is_dir()
-    assert old_file.is_file()
+    eliminados = gestor.cleanup_stale(max_age_seconds=60 * 60)
+    assert eliminados == 2
+    assert (gestor.root / id_activo).is_dir()
+    assert not directorio_obsoleto.exists()
+    assert not huerfano_obsoleto.exists()
+    assert ajeno.is_dir()
+    assert archivo_anterior.is_file()
 
 
 def test_manager_rejects_corrupt_metadata(tmp_path, base_dir):
-    manager = UploadManager(tmp_path / "uploads", base_dir, CHUNK)
-    upload_id = manager.init("meta.bin", CHUNK, "")["upload_id"]
-    (manager.root / upload_id / "meta.json").write_text("{no-json", encoding="utf-8")
+    gestor = UploadManager(tmp_path / "uploads", base_dir, CHUNK)
+    id_subida = gestor.init("meta.bin", CHUNK, "")["upload_id"]
+    (gestor.root / id_subida / "meta.json").write_text("{no-json", encoding="utf-8")
     with pytest.raises(UploadError):
-        manager.status(upload_id)
+        gestor.status(id_subida)
     with pytest.raises(UploadNotFound):
-        manager.status("f" * 32)
+        gestor.status("f" * 32)
 
 
 def test_ensure_free_space_and_unique_path(tmp_path):
@@ -229,8 +231,8 @@ def test_ensure_free_space_and_unique_path(tmp_path):
 
 
 def test_parse_range_and_iter_file(tmp_path):
-    path = tmp_path / "datos.bin"
-    path.write_bytes(b"0123456789")
+    ruta = tmp_path / "datos.bin"
+    ruta.write_bytes(b"0123456789")
     assert parse_range(None, 10) is None
     assert parse_range("items=0-1", 10) is None
     assert parse_range("bytes=2-5", 10) == (2, 5)
@@ -241,18 +243,18 @@ def test_parse_range_and_iter_file(tmp_path):
         parse_range("bytes=99-", 10)
     with pytest.raises(ValueError):
         parse_range("bytes=-0", 10)
-    assert b"".join(iter_file(path, 2, 5, block_size=2)) == b"2345"
+    assert b"".join(iter_file(ruta, 2, 5, block_size=2)) == b"2345"
 
 
 def test_upload_ids_are_validated(tmp_path, base_dir):
-    manager = UploadManager(tmp_path / "uploads", base_dir, CHUNK)
+    gestor = UploadManager(tmp_path / "uploads", base_dir, CHUNK)
     with pytest.raises(UploadNotFound):
-        manager.status("../../etc/passwd")
+        gestor.status("../../etc/passwd")
 
 
 def test_upload_dir_metadata_is_persisted(app_bundle, auth_headers):
-    info = _init_upload(app_bundle, auth_headers, filename="persistente.bin").json()
-    upload_id = info["upload_id"]
-    meta_path = Path(app_bundle.runtime.uploads.root / upload_id / "meta.json")
-    assert meta_path.is_file()
-    assert meta_path.read_text(encoding="utf-8")
+    informacion = _init_upload(app_bundle, auth_headers, filename="persistente.bin").json()
+    id_subida = informacion["upload_id"]
+    ruta_meta = Path(app_bundle.runtime.uploads.root / id_subida / "meta.json")
+    assert ruta_meta.is_file()
+    assert ruta_meta.read_text(encoding="utf-8")

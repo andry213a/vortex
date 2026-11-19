@@ -1,31 +1,35 @@
+# Receta de PyInstaller para empaquetar Vortex en Windows y Linux.
 # -*- mode: python ; coding: utf-8 -*-
 from pathlib import Path
 import os
 
 from PyInstaller.utils.hooks import collect_data_files, collect_submodules
 
-ROOT = Path(SPECPATH).resolve().parent
+RAIZ = Path(SPECPATH).resolve().parent
 
-datas = [(str(ROOT / "vortex" / "static"), "vortex/static")]
-for package in ("flet", "flet_desktop"):
+# Recursos estáticos y datos que deben viajar dentro del ejecutable.
+datos = [(str(RAIZ / "vortex" / "static"), "vortex/static")]
+for paquete in ("flet", "flet_desktop"):
     try:
-        datas += collect_data_files(package)
+        datos += collect_data_files(paquete)
     except Exception:
         pass
 
-hiddenimports = []
-for package in ("uvicorn", "zeroconf", "jose", "passlib", "zipstream", "psutil", "fastapi", "starlette"):
+# Algunos módulos se cargan de forma dinámica; los incluimos explícitamente.
+importaciones_ocultas = []
+for paquete in ("uvicorn", "zeroconf", "jose", "passlib", "zipstream", "psutil", "fastapi", "starlette"):
     try:
-        hiddenimports += collect_submodules(package)
+        importaciones_ocultas += collect_submodules(paquete)
     except Exception:
         pass
 
-a = Analysis(
-    [str(ROOT / "run.py")],
-    pathex=[str(ROOT)],
+# Analizamos las dependencias reales del punto de entrada.
+analisis = Analysis(
+    [str(RAIZ / "run.py")],
+    pathex=[str(RAIZ)],
     binaries=[],
-    datas=datas,
-    hiddenimports=hiddenimports,
+    datas=datos,
+    hiddenimports=importaciones_ocultas,
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
@@ -33,13 +37,15 @@ a = Analysis(
     noarchive=False,
 )
 
-pyz = PYZ(a.pure)
+paquete_pyz = PYZ(analisis.pure)
 
-exe = EXE(
-    pyz,
-    a.scripts,
-    a.binaries,
-    a.datas,
+# Construimos un único ejecutable sin consola para escritorio.
+
+ejecutable = EXE(
+    paquete_pyz,
+    analisis.scripts,
+    analisis.binaries,
+    analisis.datas,
     [],
     name="Vortex",
     debug=False,
@@ -52,5 +58,5 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon=str(ROOT / "build" / "vortex.ico") if os.name == "nt" else None,
+    icon=str(RAIZ / "build" / "vortex.ico") if os.name == "nt" else None,
 )

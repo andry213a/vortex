@@ -1,3 +1,5 @@
+# Control del servidor Uvicorn en un hilo y arranque headless.
+
 from __future__ import annotations
 
 import threading
@@ -18,6 +20,7 @@ class ServerStartError(Exception):
     pass
 
 
+# Arranque y parada de Uvicorn en un hilo controlado.
 class ServerController:
     def __init__(self) -> None:
         self.thread: threading.Thread | None = None
@@ -36,10 +39,10 @@ class ServerController:
                 raise ServerStartError("El servidor ya está en ejecución")
             config.validate()
             validate_port(config.port)
-            app = create_app(config)
-            runtime = app.state.runtime
-            uvicorn_config = uvicorn.Config(
-                app,
+            aplicacion = create_app(config)
+            entorno = aplicacion.state.runtime
+            config_uvicorn = uvicorn.Config(
+                aplicacion,
                 host="0.0.0.0",
                 port=config.port,
                 log_level="warning",
@@ -47,42 +50,42 @@ class ServerController:
                 loop="asyncio",
                 lifespan="on",
             )
-            server = uvicorn.Server(uvicorn_config)
-            server.install_signal_handlers = lambda: None
-            thread = threading.Thread(target=server.run, name="vortex-server", daemon=True)
-            thread.start()
-            deadline = time.monotonic() + wait_timeout
-            while time.monotonic() < deadline:
-                if server.started:
+            servidor = uvicorn.Server(config_uvicorn)
+            servidor.install_signal_handlers = lambda: None
+            hilo = threading.Thread(target=servidor.run, name="vortex-server", daemon=True)
+            hilo.start()
+            limite = time.monotonic() + wait_timeout
+            while time.monotonic() < limite:
+                if servidor.started:
                     break
-                if not thread.is_alive():
+                if not hilo.is_alive():
                     raise ServerStartError("El servidor se detuvo durante el arranque")
                 time.sleep(0.05)
             else:
-                server.should_exit = True
+                servidor.should_exit = True
                 raise ServerStartError("Tiempo de espera agotado al iniciar el servidor")
-            runtime.mdns.start()
-            runtime.audit.log(
+            entorno.mdns.start()
+            entorno.audit.log(
                 action="SERVER_START",
                 severity=INFO,
                 client_ip=local_ip(),
-                target_path=str(runtime.base_dir),
+                target_path=str(entorno.base_dir),
                 status_code=200,
                 details={"port": config.port, "auth_mode": config.auth_mode, "hostname": config.hostname},
             )
-            self.server = server
-            self.thread = thread
-            self.runtime = runtime
-            return runtime
+            self.server = servidor
+            self.thread = hilo
+            self.runtime = entorno
+            return entorno
 
     def stop(self) -> None:
         with self._lock:
             if self.server is None:
                 return
-            runtime = self.runtime
-            if runtime is not None:
-                runtime.audit.log(action="SERVER_STOP", severity=INFO, status_code=200)
-                runtime.mdns.stop()
+            entorno = self.runtime
+            if entorno is not None:
+                entorno.audit.log(action="SERVER_STOP", severity=INFO, status_code=200)
+                entorno.mdns.stop()
             self.server.should_exit = True
             if self.thread is not None:
                 self.thread.join(timeout=5)
@@ -95,19 +98,19 @@ def run_headless(config: ServerConfig) -> None:
     ensure_standard_streams()
     config.validate()
     validate_port(config.port)
-    app = create_app(config)
-    runtime: Runtime = app.state.runtime
-    runtime.mdns.start()
-    runtime.audit.log(
+    aplicacion = create_app(config)
+    entorno: Runtime = aplicacion.state.runtime
+    entorno.mdns.start()
+    entorno.audit.log(
         action="SERVER_START",
         severity=INFO,
         client_ip=local_ip(),
-        target_path=str(runtime.base_dir),
+        target_path=str(entorno.base_dir),
         status_code=200,
         details={"port": config.port, "auth_mode": config.auth_mode, "hostname": config.hostname},
     )
     try:
-        uvicorn.run(app, host="0.0.0.0", port=config.port, log_level="info", access_log=False, lifespan="on")
+        uvicorn.run(aplicacion, host="0.0.0.0", port=config.port, log_level="info", access_log=False, lifespan="on")
     finally:
-        runtime.mdns.stop()
-        runtime.audit.log(action="SERVER_STOP", severity=INFO, status_code=200)
+        entorno.mdns.stop()
+        entorno.audit.log(action="SERVER_STOP", severity=INFO, status_code=200)
