@@ -29,10 +29,7 @@ jobs:
       - name: Compilar Vortex.exe
         shell: cmd
         run: |
-          flet pack run.py --name Vortex --icon build\vortex.ico --add-data "vortex\static;vortex\static" --distpath dist\windows
-          if errorlevel 1 (
-            pyinstaller build\vortex.spec --noconfirm --distpath dist\windows --workpath build\work
-          )
+          python -m PyInstaller build\vortex.spec --noconfirm --clean --distpath dist\windows --workpath build\work-windows
 
       - name: Guardar el ejecutable
         uses: actions/upload-artifact@v4
