@@ -4,10 +4,11 @@ import json
 import logging
 import threading
 import uuid
+from collections.abc import Callable
 from datetime import datetime, timezone
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 from ..config import AUDIT_BACKUPS, MAX_AUDIT_BYTES
 
@@ -54,7 +55,7 @@ class AuditLogger:
         self.log_file = log_file
         self._listeners: list[Callable[[dict[str, Any]], None]] = []
         self._lock = threading.Lock()
-        self._logger = logging.getLogger(f"vortex.audit.{id(self)}")
+        self._logger = logging.getLogger(f"vortex.audit.{uuid.uuid4().hex}")
         self._logger.setLevel(logging.INFO)
         self._logger.propagate = False
         if not self._logger.handlers:

@@ -14,6 +14,7 @@ import webbrowser
 from collections import deque
 from email.message import Message
 from pathlib import Path
+from typing import ClassVar
 from urllib.parse import parse_qs, unquote, urlencode, urlsplit, urlunsplit
 
 import flet as ft
@@ -21,7 +22,8 @@ import httpx
 import qrcode
 from zeroconf import ServiceBrowser, ServiceListener, Zeroconf
 
-from ..backend.audit import WARNING as AUDIT_WARNING, log_standalone
+from ..backend.audit import WARNING as AUDIT_WARNING
+from ..backend.audit import log_standalone
 from ..backend.mdns import local_ip
 from ..backend.security import file_kind
 from ..backend.system import needs_elevation, relaunch_elevated, suggest_free_port, validate_port
@@ -63,7 +65,7 @@ class _VortexServiceListener(ServiceListener):
 
 
 class VortexUI:
-    ACCENT_PRESETS = {
+    ACCENT_PRESETS: ClassVar[dict[str, str]] = {
         "Azul Vortex": "#60A5FA",
         "Violeta": "#A78BFA",
         "Verde": "#34D399",
@@ -80,6 +82,7 @@ class VortexUI:
         self.server = ServerController()
         self.base_url = ""
         self.is_remote = False
+        self.remote_guest_write = True
         self.remote_download_notice: tuple[str, bool] | None = None
         self.discovery_zeroconf: Zeroconf | None = None
         self.discovery_browser: ServiceBrowser | None = None
@@ -668,6 +671,21 @@ class VortexUI:
             ],
             on_change=self._on_auth_change,
         )
+        self.guest_dropdown = ft.Dropdown(
+            label="Permisos de invitado",
+            value="write" if self.config.guest_write else "read",
+            width=210,
+            text_size=13,
+            color=TEXT,
+            bgcolor=SURFACE_ALT,
+            border_color=BORDER,
+            focused_border_color=ACCENT,
+            border_radius=10,
+            options=[
+                ft.dropdown.Option(key="read", text="Solo lectura"),
+                ft.dropdown.Option(key="write", text="Control total"),
+            ],
+        )
         self.token_field = self._field("Token de acceso", self.config.auto_token or generate_auto_token(), read_only=True, expand=True)
         self.regenerate_button = ft.IconButton(
             icon=ft.icons.REFRESH,
@@ -729,13 +747,26 @@ class VortexUI:
                 ft.Divider(color=BORDER),
                 ft.Row([self.dir_field, ft.IconButton(icon=ft.icons.FOLDER_OPEN, icon_color=ACCENT, tooltip="Elegir carpeta", on_click=self._pick_directory)]),
                 ft.Row([self.port_field, self.auth_dropdown], spacing=16),
+                ft.Row(
+                    [
+                        self.guest_dropdown,
+                        ft.Text(
+                            "Solo lectura impide crear, editar o borrar; Control total permite CRUD completo.",
+                            size=11,
+                            color=MUTED,
+                            expand=True,
+                        ),
+                    ],
+                    spacing=12,
+                    vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                ),
                 self.auth_extra,
                 ft.Divider(color=BORDER),
                 self.setup_error,
                 ft.Row(
                     [
                         ft.Text(
-                            "El servidor escucha en toda la LAN; los invitados siempre tienen control total.",
+                            "El servidor escucha en toda la LAN; ajusta aquí los permisos de los invitados.",
                             size=11,
                             color=MUTED,
                             expand=True,
@@ -909,6 +940,7 @@ class VortexUI:
         self.role = None
         self.remote_auth_mode = str(auth_status.get("auth_mode", "none"))
         self.remote_requires_login = bool(auth_status.get("requires_login"))
+        self.remote_guest_write = bool(auth_status.get("guest_write", True))
         self._start_polling()
         if self.remote_requires_login:
             self.show_login()
@@ -1149,6 +1181,7 @@ class VortexUI:
             port=port,
             auth_mode=self.auth_dropdown.value,
             auto_token=(self.token_field.value or "").strip() or generate_auto_token(),
+            guest_write=(self.guest_dropdown.value or "write") == "write",
             password_hash=self.config.password_hash,
             hostname=self.config.hostname,
             chunk_size=self.config.chunk_size,
@@ -1167,7 +1200,7 @@ class VortexUI:
         try:
             cfg.validate()
             validate_port(cfg.port)
-        except ValueError as exc:
+        except (TypeError, ValueError) as exc:
             suggestion = suggest_free_port(cfg.port + 1) if "uso" in str(exc) else None
             text = str(exc)
             if suggestion:
@@ -1390,7 +1423,8 @@ class VortexUI:
 
         def continue_as_guest(e: ft.ControlEvent | None = None) -> None:
             self.token = None
-            self.role = "guest_write"
+            guest_write = self.remote_guest_write if self.is_remote else self.config.guest_write
+            self.role = "guest_write" if guest_write else "guest_read"
             if self.http is not None:
                 self.http.headers.pop("Authorization", None)
             self.show_browser()
@@ -2406,7 +2440,7 @@ class VortexUI:
             for block in iter(lambda: source.read(1024 * 1024), b""):
                 fingerprint.update(block)
         resume_key = hashlib.sha256(
-            f"{self.base_url}|{target_dir}|{local.name}|{size}|{fingerprint.hexdigest()}".encode("utf-8")
+            f"{self.base_url}|{target_dir}|{local.name}|{size}|{fingerprint.hexdigest()}".encode()
         ).hexdigest()
         state_file = app_data_dir() / "resumable_uploads.json"
         try:
@@ -2720,9 +2754,8 @@ class VortexUI:
         elif key == "escape":
             if self.palette_dialog is not None:
                 self._close_palette()
-        elif e.ctrl and key == "r":
-            if self.http is not None:
-                self.refresh_listing(self.current_path)
+        elif e.ctrl and key == "r" and self.http is not None:
+            self.refresh_listing(self.current_path)
 
 
 def _libmpv_available() -> bool:

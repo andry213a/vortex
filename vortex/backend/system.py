@@ -36,7 +36,7 @@ def port_in_use(port: int) -> bool:
 
 def validate_port(port: int) -> None:
     if not isinstance(port, int) or isinstance(port, bool):
-        raise ValueError("El puerto debe ser un número entero")
+        raise TypeError("El puerto debe ser un número entero")
     if not 1 <= port <= 65535:
         raise ValueError("El puerto debe estar entre 1 y 65535")
     if port_in_use(port):

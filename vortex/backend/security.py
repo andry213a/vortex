@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import difflib
 import ipaddress
+import itertools
 import re
 import threading
 import time
@@ -110,7 +111,7 @@ def _subsequence_score(q: str, t: str) -> float:
             return 0.0
         positions.append(found)
         index = found + 1
-    gaps = sum(b - a - 1 for a, b in zip(positions, positions[1:]))
+    gaps = sum(b - a - 1 for a, b in itertools.pairwise(positions))
     return max(1.0, 25.0 - gaps * 1.5 - (len(t) - len(q)) * 0.05)
 
 
@@ -120,8 +121,7 @@ def _similarity_score(q: str, t: str) -> float:
     if span and len(t) > span:
         for start in range(len(t) - span + 1):
             ratio = difflib.SequenceMatcher(None, q, t[start : start + span]).ratio()
-            if ratio > best:
-                best = ratio
+            best = max(best, ratio)
     if best < 0.62:
         return 0.0
     return max(1.0, best * 30.0)

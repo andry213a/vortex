@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import flet as ft
-import pytest
 
 from vortex.frontend import app as frontend_app
 from vortex.frontend.app import VortexUI

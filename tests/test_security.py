@@ -30,7 +30,7 @@ def test_path_traversal_is_audited(app_bundle, auth_headers):
     assert any(record["action"] == "PATH_TRAVERSAL" and record["severity"] == "SECURITY" for record in records)
 
 
-def test_guests_always_have_control_total_even_for_legacy_config(tmp_path, base_dir, monkeypatch):
+def test_guests_respect_read_only_setting(tmp_path, base_dir, monkeypatch):
     from fastapi.testclient import TestClient
 
     from vortex.backend.app import create_app
@@ -50,12 +50,14 @@ def test_guests_always_have_control_total_even_for_legacy_config(tmp_path, base_
     with TestClient(app) as client:
         status = client.get("/api/auth/status").json()
         assert status["allow_guest"] is True
-        assert status["guest_write"] is True
+        assert status["guest_write"] is False
         listing = client.get("/api/files", params={"path": ""})
         assert listing.status_code == 200
-        response = client.post("/api/files/mkdir", json={"path": "", "name": "permitida"})
-        assert response.status_code == 201
-        assert (base_dir / "permitida").is_dir()
+        read = client.get("/api/files/read", params={"path": "hola.txt"})
+        assert read.status_code == 200
+        response = client.post("/api/files/mkdir", json={"path": "", "name": "denegada"})
+        assert response.status_code == 403
+        assert not (base_dir / "denegada").exists()
 
 
 def test_rate_limiter_status_does_not_deadlock():

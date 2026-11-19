@@ -62,11 +62,11 @@ class ServerConfig:
 
     def __post_init__(self) -> None:
         self.allow_guest = True
-        self.guest_write = True
 
     def validate(self) -> None:
         self.allow_guest = True
-        self.guest_write = True
+        if not isinstance(self.guest_write, bool):
+            self.guest_write = True
         if self.auth_mode not in AUTH_MODES:
             raise ValueError(f"Modo de autenticación inválido: {self.auth_mode}")
         if not isinstance(self.port, int) or not 1 <= self.port <= 65535:
@@ -98,7 +98,7 @@ class ServerConfig:
         return data
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "ServerConfig":
+    def from_dict(cls, data: dict[str, Any]) -> ServerConfig:
         known = {f for f in cls.__dataclass_fields__}
         values = {k: v for k, v in data.items() if k in known}
         values.pop("manual_password", None)

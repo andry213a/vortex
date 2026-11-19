@@ -12,7 +12,7 @@ Servidor local de archivos tipo NAS ligero, multiplataforma (**Windows, Linux, W
 - **Búsqueda difusa** con operadores: `type:video`, `ext:pdf`, `size:>1gb`, `size:<10mb`.
 - **Subidas inteligentes**: directa para `< 100 MB` y *auto-chunking* de 10 MB para archivos grandes, con reanudación de bloques y widget flotante **Mini-Vortex**.
 - **Descargas con `Range Requests`** (seek de vídeo) y **ZIP en streaming** con `zipstream-ng` (sin disco intermedio).
-- **Acceso de invitados siempre activo**: cualquier invitado en la LAN obtiene control total sobre los archivos y carpetas compartidos.
+- **Acceso de invitados configurable**: el host elige entre **Solo lectura** o **Control total** para los invitados de la LAN.
 - **Autenticación del host**: automática (token), manual (contraseña) o nula (LAN pública).
 - **Zero Trust**: protección contra *path traversal*, JWT en memoria, *rate limiting* (5 intentos / 15 min) y sin filtración de existencia de archivos a usuarios no autenticados.
 - **Auditoría JSON** con rotación (10 MB × 5) y consola en vivo solo para el host.
@@ -50,7 +50,7 @@ pip install -r requirements.txt
 python run.py
 ```
 
-Se abre la ventana de configuración: carpeta raíz, puerto y modo de autenticación del host. Los invitados siempre tienen control total sobre el contenido compartido. Al iniciar, el servidor escucha en toda la LAN y la app entra como host.
+Se abre la ventana de configuración: carpeta raíz, puerto, modo de autenticación del host y permisos de invitado (**Solo lectura** o **Control total**). Al iniciar, el servidor escucha en toda la LAN y la app entra como host.
 
 La ventana nativa usa un marco propio con la paleta de Vortex: barra de título arrastrable, estado `EN LÍNEA`/`DETENIDO` y controles de minimizar, maximizar y cerrar. El cliente web omite ese marco y usa la página del navegador. En Linux, si falta `libmpv.so.1`, la interfaz se abre automáticamente en el navegador en lugar de fallar.
 
@@ -81,7 +81,7 @@ Opciones: `--auth auto|manual|none`, `--token`, `--password`, `--hostname`.
 | `manual` | El host usa una contraseña definida por el usuario, almacenada con `passlib` (PBKDF2-SHA256). |
 | `none` | El host no usa credenciales; el acceso sigue limitado a la LAN. |
 
-Los invitados siempre pueden leer, crear, editar, renombrar y borrar archivos y carpetas dentro de la raíz compartida. El token o contraseña protege el acceso administrativo del host; no restringe a los invitados. En modo `none`, el host local (loopback) conserva privilegios de host.
+Los invitados siempre pueden acceder a la LAN, pero el host decide si tienen **Solo lectura** o **Control total** (leer, crear, editar, renombrar y borrar) dentro de la raíz compartida. El token o contraseña protege el acceso administrativo del host; no restringe a los invitados. En modo `none`, el host local (loopback) conserva privilegios de host.
 
 ## Compilación
 

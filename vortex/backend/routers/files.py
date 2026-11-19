@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-import mimetypes
 import hashlib
+import mimetypes
 import os
 import shutil
 import time
@@ -10,6 +10,7 @@ from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, UploadFile
 from fastapi.responses import Response, StreamingResponse
+from starlette.concurrency import run_in_threadpool
 from zipstream import ZipStream
 
 from ..audit import INFO, SECURITY
@@ -523,13 +524,16 @@ async def upload_direct(
     temporary = destination.with_name(destination.name + ".vortex-upload")
     size = 0
     try:
-        with open(temporary, "wb") as output:
+        output = await run_in_threadpool(open, temporary, "wb")
+        try:
             while True:
                 chunk = await file.read(1024 * 1024)
                 if not chunk:
                     break
                 size += len(chunk)
-                output.write(chunk)
+                await run_in_threadpool(output.write, chunk)
+        finally:
+            await run_in_threadpool(output.close)
         temporary.replace(destination)
     except OSError as exc:
         temporary.unlink(missing_ok=True)
